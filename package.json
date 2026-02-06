@@ -1,0 +1,26 @@
+{
+  "name": "claw-rubber",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.25",
+    "ai": "^6.0.73",
+    "ollama-ai-provider": "^1.2.0",
+    "pino": "^10.3.0",
+    "rotating-file-stream": "^3.2.8",
+    "zod": "^4.3.6"
+  }
+}
