@@ -42,6 +42,12 @@ export async function handleDashboardAllowlistPost(
   request: Request,
   ctx: ServerContext,
 ): Promise<Response> {
+  if (!ctx.config.enableDashboardWriteApi) {
+    return errorResponse(403, "Dashboard write API is disabled", {
+      hint: "Set CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API=true to enable runtime allowlist changes",
+    })
+  }
+
   const payload = await readJsonBody(request)
   const parsed = AllowlistRequestSchema.safeParse(payload)
   if (!parsed.success) {

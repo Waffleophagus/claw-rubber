@@ -42,13 +42,15 @@ export class ContentFetcher {
       throw new Error("Only https URLs are allowed")
     }
 
-    await this.assertPublicHost(first.hostname)
-
     if (this.config.websiteRendererBackend === "browserless") {
       try {
-        const rendered = await this.browserlessClient.render(url)
+        const resolvedFinalUrl = await this.resolveFinalUrl(url)
+        const rendered = await this.browserlessClient.render(resolvedFinalUrl)
+        const finalUrl = rendered.finalUrl ?? resolvedFinalUrl
+        await this.validateFinalUrl(finalUrl)
+
         return {
-          finalUrl: rendered.finalUrl,
+          finalUrl,
           contentType: "text/html",
           body: rendered.html,
           backendUsed: "browserless",
@@ -135,6 +137,65 @@ export class ContentFetcher {
     }
 
     throw new Error("Too many redirects")
+  }
+
+  private async resolveFinalUrl(url: string): Promise<string> {
+    const first = new URL(url)
+    let current = first
+
+    for (let i = 0; i <= this.config.profileSettings.maxRedirects; i += 1) {
+      await this.assertPublicHost(current.hostname)
+
+      const response = await this.fetchImpl(current, {
+        method: "GET",
+        redirect: "manual",
+        headers: {
+          "User-Agent": this.config.userAgent,
+          "Accept": "text/html,text/plain,application/xhtml+xml",
+        },
+        signal: AbortSignal.timeout(this.config.profileSettings.fetchTimeoutMs),
+      })
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location")
+
+        await consumeAndDiscardBody(response)
+
+        if (!location) {
+          throw new Error(`Redirect response without location from ${current}`)
+        }
+
+        current = new URL(location, current)
+
+        if (current.protocol !== "https:") {
+          throw new Error("Redirected to non-https URL")
+        }
+
+        continue
+      }
+
+      await consumeAndDiscardBody(response)
+      return current.toString()
+    }
+
+    throw new Error("Too many redirects")
+  }
+
+  private async validateFinalUrl(value: string): Promise<void> {
+    const parsed = new URL(value)
+    if (parsed.protocol !== "https:") {
+      throw new Error("Renderer returned non-https final URL")
+    }
+
+    await this.assertPublicHost(parsed.hostname)
+  }
+}
+
+async function consumeAndDiscardBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel()
+  } catch {
+    // no-op
   }
 }
 

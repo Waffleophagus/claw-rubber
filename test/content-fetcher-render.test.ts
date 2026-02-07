@@ -30,6 +30,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     allowlistDomains: [],
     blocklistDomains: [],
     languageNameAllowlistExtra: [],
+    enableDashboardWriteApi: false,
     dbPath: "./data/test.db",
     logDir: "./data/logs",
     resultTtlMs: 600_000,
@@ -104,6 +105,40 @@ describe("content fetcher render backend", () => {
     expect(result.rendered).toBe(true)
     expect(result.fallbackUsed).toBe(false)
     expect(result.body).toContain("rendered")
+  })
+
+  test("uses resolved redirect URL when renderer cannot report final URL", async () => {
+    let requestCount = 0
+
+    const fetcher = new ContentFetcher(makeConfig({ websiteRendererBackend: "browserless" }), {
+      browserlessClient: {
+        render: async (url: string) => ({
+          finalUrl: null,
+          html: `<html>rendered-from:${url}</html>`,
+        }),
+      },
+      assertPublicHost: async () => {},
+      fetchImpl: async () => {
+        requestCount += 1
+        if (requestCount === 1) {
+          return new Response(null, {
+            status: 302,
+            headers: { location: "https://final.example/path" },
+          })
+        }
+
+        return new Response("<html>resolved</html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        })
+      },
+    })
+
+    const result = await fetcher.fetchPage("https://start.example/path")
+
+    expect(result.backendUsed).toBe("browserless")
+    expect(result.finalUrl).toBe("https://final.example/path")
+    expect(result.body).toContain("https://final.example/path")
   })
 
   test("falls back to plain fetch when browserless fails and fallback is enabled", async () => {

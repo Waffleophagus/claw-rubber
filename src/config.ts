@@ -47,6 +47,7 @@ export interface AppConfig {
   allowlistDomains: string[]
   blocklistDomains: string[]
   languageNameAllowlistExtra: string[]
+  enableDashboardWriteApi: boolean
   dbPath: string
   logDir: string
   resultTtlMs: number
@@ -128,6 +129,7 @@ const EnvSchema = z.object({
   CLAWRUBBER_ALLOWLIST_DOMAINS: z.string().optional(),
   CLAWRUBBER_BLOCKLIST_DOMAINS: z.string().optional(),
   CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA: z.string().optional(),
+  CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API: z.string().optional(),
   CLAWRUBBER_DB_PATH: z.string().default("./data/claw-rubber.db"),
   CLAWRUBBER_LOG_DIR: z.string().default("./data/logs"),
   CLAWRUBBER_RESULT_TTL_MINUTES: z.string().optional(),
@@ -257,6 +259,7 @@ export function loadConfig(env = process.env): AppConfig {
     languageNameAllowlistExtra: parseLanguageNameList(
       parsed.CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA,
     ),
+    enableDashboardWriteApi: toBoolean(parsed.CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API, true),
     dbPath: parsed.CLAWRUBBER_DB_PATH,
     logDir: parsed.CLAWRUBBER_LOG_DIR,
     resultTtlMs: toInteger(parsed.CLAWRUBBER_RESULT_TTL_MINUTES, 30) * 60 * 1000,

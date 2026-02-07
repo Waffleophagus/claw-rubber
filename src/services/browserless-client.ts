@@ -1,7 +1,7 @@
 import type { AppConfig, BrowserlessWaitUntil } from "../config"
 
 export interface BrowserlessRenderResult {
-  finalUrl: string
+  finalUrl: string | null
   html: string
 }
 
@@ -46,12 +46,38 @@ export class BrowserlessClient implements RenderClient {
     }
 
     const html = await readBodyWithLimit(response, this.config.browserless.maxHtmlBytes)
+    const finalUrl = extractFinalUrl(response, url)
 
     return {
-      finalUrl: url,
+      finalUrl,
       html,
     }
   }
+}
+
+function extractFinalUrl(response: Response, requestedUrl: string): string | null {
+  const headerCandidates = [
+    "x-browserless-final-url",
+    "x-final-url",
+    "x-response-url",
+    "content-location",
+    "location",
+  ]
+
+  for (const header of headerCandidates) {
+    const rawValue = response.headers.get(header)
+    if (!rawValue) {
+      continue
+    }
+
+    try {
+      return new URL(rawValue, requestedUrl).toString()
+    } catch {
+      // Keep checking other hints.
+    }
+  }
+
+  return null
 }
 
 function buildBrowserlessContentEndpoint(config: AppConfig): string {

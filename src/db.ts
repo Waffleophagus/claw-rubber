@@ -130,6 +130,30 @@ export interface RuntimeAllowlistDomain {
   addedAt: number
 }
 
+interface DashboardEventRow {
+  event_id: string
+  source: DashboardSource
+  created_at: number
+  result_id: string
+  decision: "allow" | "block"
+  domain: string
+  url: string | null
+  reason: string | null
+  blocked_by: string | null
+  allowed_by: string | null
+  flags_json: string
+  score: number
+  medium_threshold: number | null
+  block_threshold: number | null
+  bypassed: number
+  duration_ms: number | null
+  title: string | null
+  query: string | null
+  request_id: string | null
+  trace_kind: "search-result-fetch" | "direct-web-fetch" | "unknown"
+  search_rank: number | null
+}
+
 export class AppDb {
   private readonly db: Database
 
@@ -245,6 +269,11 @@ export class AppDb {
     this.ensureColumn("search_results_cache", "search_rank", "INTEGER NOT NULL DEFAULT 0")
     this.ensureColumn("flagged_payloads", "fetch_event_id", "INTEGER")
     this.ensureColumn("flagged_payloads", "evidence_json", "TEXT")
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_events_decision ON fetch_events(decision)`)
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_events_allowed_by ON fetch_events(allowed_by)`)
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_events_blocked_by ON fetch_events(blocked_by)`)
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_events_trace_kind ON fetch_events(trace_kind)`)
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_fetch_events_search_rank ON fetch_events(search_rank)`)
     this.db.exec(
       `CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id)`,
     )
@@ -482,69 +511,126 @@ export class AppDb {
     total: number
     events: DashboardEventRecord[]
   } {
-    const all = this.getDashboardEventsUnpaginated(query)
-    const events = all.slice(query.offset, query.offset + query.limit)
-    return { total: all.length, events }
+    const { cteSql, params } = this.buildDashboardFilteredDataset(query)
+    const totalRow = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT COUNT(*) AS total
+          FROM filtered_events
+        `,
+      )
+      .get(...params) as { total: number } | undefined
+
+    const rows = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT
+            event_id,
+            source,
+            created_at,
+            result_id,
+            decision,
+            domain,
+            url,
+            reason,
+            blocked_by,
+            allowed_by,
+            flags_json,
+            score,
+            medium_threshold,
+            block_threshold,
+            bypassed,
+            duration_ms,
+            title,
+            query,
+            request_id,
+            trace_kind,
+            search_rank
+          FROM filtered_events
+          ORDER BY created_at DESC, event_id ASC
+          LIMIT ? OFFSET ?
+        `,
+      )
+      .all(...params, query.limit, query.offset) as DashboardEventRow[]
+
+    return {
+      total: totalRow?.total ?? 0,
+      events: rows.map((row) => this.mapDashboardEventRow(row)),
+    }
   }
 
   getDashboardOverview(query: Omit<DashboardEventsQuery, "offset" | "limit">): DashboardOverview {
-    const events = this.getDashboardEventsUnpaginated({
-      ...query,
-      offset: 0,
-      limit: Number.MAX_SAFE_INTEGER,
-    })
-    const blocked = events.filter((event) => event.decision === "block")
-    const allowed = events.filter((event) => event.decision === "allow")
-    const uniqueBlockedDomains = new Set(blocked.map((event) => event.domain)).size
+    const { cteSql, params } = this.buildDashboardFilteredDataset(query)
+    const row = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT
+            COUNT(*) AS total_events,
+            SUM(CASE WHEN decision = 'block' THEN 1 ELSE 0 END) AS blocked_events,
+            SUM(CASE WHEN source = 'fetch' THEN 1 ELSE 0 END) AS source_fetch_events,
+            SUM(CASE WHEN source = 'search' THEN 1 ELSE 0 END) AS source_search_events,
+            COUNT(DISTINCT CASE WHEN decision = 'block' THEN domain END) AS unique_blocked_domains
+          FROM filtered_events
+        `,
+      )
+      .get(...params) as
+      | {
+          total_events: number
+          blocked_events: number | null
+          source_fetch_events: number | null
+          source_search_events: number | null
+          unique_blocked_domains: number | null
+        }
+      | undefined
 
-    const blockedByCounts = new Map<string, number>()
-    for (const event of blocked) {
-      if (!event.blockedBy) {
-        continue
-      }
-      blockedByCounts.set(event.blockedBy, (blockedByCounts.get(event.blockedBy) ?? 0) + 1)
-    }
+    const totalEvents = row?.total_events ?? 0
+    const blockedEvents = row?.blocked_events ?? 0
 
-    let topBlockedBy: string | null = null
-    let topBlockedByCount = -1
-    for (const [key, value] of blockedByCounts.entries()) {
-      if (value > topBlockedByCount) {
-        topBlockedBy = key
-        topBlockedByCount = value
-      }
-    }
+    const topBlockedByRow = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT blocked_by AS value
+          FROM filtered_events
+          WHERE decision = 'block' AND blocked_by IS NOT NULL AND TRIM(blocked_by) <> ''
+          GROUP BY blocked_by
+          ORDER BY COUNT(*) DESC, blocked_by ASC
+          LIMIT 1
+        `,
+      )
+      .get(...params) as { value: string } | undefined
 
-    const allowedByCounts = new Map<string, number>()
-    for (const event of allowed) {
-      if (!event.allowedBy) {
-        continue
-      }
-      allowedByCounts.set(event.allowedBy, (allowedByCounts.get(event.allowedBy) ?? 0) + 1)
-    }
-
-    let topAllowedBy: string | null = null
-    let topAllowedByCount = -1
-    for (const [key, value] of allowedByCounts.entries()) {
-      if (value > topAllowedByCount) {
-        topAllowedBy = key
-        topAllowedByCount = value
-      }
-    }
+    const topAllowedByRow = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT allowed_by AS value
+          FROM filtered_events
+          WHERE decision = 'allow' AND allowed_by IS NOT NULL AND TRIM(allowed_by) <> ''
+          GROUP BY allowed_by
+          ORDER BY COUNT(*) DESC, allowed_by ASC
+          LIMIT 1
+        `,
+      )
+      .get(...params) as { value: string } | undefined
 
     const bySource = {
-      fetch: events.filter((event) => event.source === "fetch").length,
-      search: events.filter((event) => event.source === "search").length,
+      fetch: row?.source_fetch_events ?? 0,
+      search: row?.source_search_events ?? 0,
     }
 
     return {
-      totalEvents: events.length,
-      blockedEvents: blocked.length,
-      allowedEvents: events.length - blocked.length,
-      blockedRate: events.length > 0 ? blocked.length / events.length : 0,
-      uniqueBlockedDomains,
+      totalEvents,
+      blockedEvents,
+      allowedEvents: totalEvents - blockedEvents,
+      blockedRate: totalEvents > 0 ? blockedEvents / totalEvents : 0,
+      uniqueBlockedDomains: row?.unique_blocked_domains ?? 0,
       bySource,
-      topBlockedBy,
-      topAllowedBy,
+      topBlockedBy: topBlockedByRow?.value ?? null,
+      topAllowedBy: topAllowedByRow?.value ?? null,
     }
   }
 
@@ -552,109 +638,110 @@ export class AppDb {
     query: Omit<DashboardEventsQuery, "offset" | "limit">,
     bucketMs: number,
   ): DashboardTimeseriesPoint[] {
-    const events = this.getDashboardEventsUnpaginated({
-      ...query,
-      offset: 0,
-      limit: Number.MAX_SAFE_INTEGER,
-    })
-    const buckets = new Map<number, DashboardTimeseriesPoint>()
+    const { cteSql, params } = this.buildDashboardFilteredDataset(query)
+    const safeBucketMs = Math.max(1, Math.floor(bucketMs))
+    const rows = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT
+            CAST(created_at / ? AS INTEGER) * ? AS bucket_start,
+            COUNT(*) AS total,
+            SUM(CASE WHEN decision = 'block' THEN 1 ELSE 0 END) AS blocked,
+            SUM(CASE WHEN decision = 'allow' THEN 1 ELSE 0 END) AS allowed,
+            SUM(CASE WHEN source = 'fetch' THEN 1 ELSE 0 END) AS fetch,
+            SUM(CASE WHEN source = 'search' THEN 1 ELSE 0 END) AS search
+          FROM filtered_events
+          GROUP BY bucket_start
+          ORDER BY bucket_start ASC
+        `,
+      )
+      .all(...params, safeBucketMs, safeBucketMs) as Array<{
+      bucket_start: number
+      total: number
+      blocked: number | null
+      allowed: number | null
+      fetch: number | null
+      search: number | null
+    }>
 
-    for (const event of events) {
-      const bucketStart = Math.floor(event.createdAt / bucketMs) * bucketMs
-      if (!buckets.has(bucketStart)) {
-        buckets.set(bucketStart, {
-          bucketStart,
-          total: 0,
-          blocked: 0,
-          allowed: 0,
-          fetch: 0,
-          search: 0,
-        })
-      }
-
-      const point = buckets.get(bucketStart)!
-      point.total += 1
-      if (event.decision === "block") {
-        point.blocked += 1
-      } else {
-        point.allowed += 1
-      }
-
-      if (event.source === "fetch") {
-        point.fetch += 1
-      } else {
-        point.search += 1
-      }
-    }
-
-    return [...buckets.values()].sort((a, b) => a.bucketStart - b.bucketStart)
+    return rows.map((row) => ({
+      bucketStart: row.bucket_start,
+      total: row.total,
+      blocked: row.blocked ?? 0,
+      allowed: row.allowed ?? 0,
+      fetch: row.fetch ?? 0,
+      search: row.search ?? 0,
+    }))
   }
 
   getDashboardTopDomains(
     query: Omit<DashboardEventsQuery, "offset" | "limit">,
     limit: number,
   ): DashboardTopItem[] {
-    return this.getTopItems(
-      this.getDashboardEventsUnpaginated({
-        ...query,
-        offset: 0,
-        limit: Number.MAX_SAFE_INTEGER,
-      }),
-      (event) => event.domain,
-      limit,
-    )
+    return this.getDashboardTopItemsByColumn(query, "domain", limit)
   }
 
   getDashboardTopReasons(
     query: Omit<DashboardEventsQuery, "offset" | "limit">,
     limit: number,
   ): DashboardTopItem[] {
-    return this.getTopItems(
-      this.getDashboardEventsUnpaginated({
-        ...query,
-        offset: 0,
-        limit: Number.MAX_SAFE_INTEGER,
-      }),
-      (event) => event.reason,
-      limit,
-    )
+    return this.getDashboardTopItemsByColumn(query, "reason", limit)
   }
 
   getDashboardTopFlags(
     query: Omit<DashboardEventsQuery, "offset" | "limit">,
     limit: number,
   ): DashboardTopItem[] {
-    const events = this.getDashboardEventsUnpaginated({
-      ...query,
-      offset: 0,
-      limit: Number.MAX_SAFE_INTEGER,
-    })
-    const counter = new Map<string, number>()
-    for (const event of events) {
-      for (const flag of event.flags) {
-        counter.set(flag, (counter.get(flag) ?? 0) + 1)
-      }
-    }
+    const { cteSql, params } = this.buildDashboardFilteredDataset(query)
+    const rows = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT
+            CAST(flags.value AS TEXT) AS value,
+            COUNT(*) AS count
+          FROM filtered_events
+          JOIN json_each(filtered_events.flags_json) AS flags
+          WHERE TRIM(CAST(flags.value AS TEXT)) <> ''
+          GROUP BY CAST(flags.value AS TEXT)
+          ORDER BY count DESC, value ASC
+          LIMIT ?
+        `,
+      )
+      .all(...params, limit) as Array<{ value: string; count: number }>
 
-    return [...counter.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, limit)
-      .map(([value, count]) => ({ value, count }))
+    return rows.map((row) => ({
+      value: row.value,
+      count: row.count,
+    }))
   }
 
   getDashboardTopAllowedBy(
     query: Omit<DashboardEventsQuery, "offset" | "limit">,
     limit: number,
   ): DashboardTopItem[] {
-    return this.getTopItems(
-      this.getDashboardEventsUnpaginated({
-        ...query,
-        offset: 0,
-        limit: Number.MAX_SAFE_INTEGER,
-      }).filter((event) => event.decision === "allow"),
-      (event) => event.allowedBy,
-      limit,
-    )
+    const { cteSql, params } = this.buildDashboardFilteredDataset(query)
+    const rows = this.db
+      .prepare(
+        `
+          ${cteSql}
+          SELECT
+            allowed_by AS value,
+            COUNT(*) AS count
+          FROM filtered_events
+          WHERE decision = 'allow' AND allowed_by IS NOT NULL AND TRIM(allowed_by) <> ''
+          GROUP BY allowed_by
+          ORDER BY count DESC, value ASC
+          LIMIT ?
+        `,
+      )
+      .all(...params, limit) as Array<{ value: string; count: number }>
+
+    return rows.map((row) => ({
+      value: row.value,
+      count: row.count,
+    }))
   }
 
   getDashboardEventDetail(eventId: string): DashboardEventDetail | null {
@@ -861,6 +948,15 @@ export class AppDb {
     this.db.prepare(`DELETE FROM search_requests WHERE created_at <= ?`).run(now - retentionMs)
   }
 
+  isHealthy(): boolean {
+    try {
+      this.db.query("SELECT 1").get()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   private ensureColumn(tableName: string, columnName: string, columnDefinition: string): void {
     if (this.hasColumn(tableName, columnName)) {
       return
@@ -874,84 +970,43 @@ export class AppDb {
     return rows.some((row) => row.name === columnName)
   }
 
-  private getDashboardEventsUnpaginated(query: DashboardEventsQuery): DashboardEventRecord[] {
-    const fetchEvents =
-      query.source === "search" ? [] : this.getFetchEventsInRange(query.from, query.to)
-    const searchEvents =
-      query.source === "fetch" ? [] : this.getSearchBlockEventsInRange(query.from, query.to)
-
-    const combined = [...fetchEvents, ...searchEvents].filter((event) =>
-      this.matchesDashboardFilters(event, query),
-    )
-    combined.sort((a, b) => b.createdAt - a.createdAt || a.eventId.localeCompare(b.eventId))
-    return combined
-  }
-
-  private getFetchEventsInRange(from: number, to: number): DashboardEventRecord[] {
+  private getDashboardTopItemsByColumn(
+    query: Omit<DashboardEventsQuery, "offset" | "limit">,
+    column: "domain" | "reason",
+    limit: number,
+  ): DashboardTopItem[] {
+    const { cteSql, params } = this.buildDashboardFilteredDataset(query)
     const rows = this.db
       .prepare(
         `
+          ${cteSql}
           SELECT
-            fe.id,
-            fe.result_id,
-            fe.domain,
-            fe.url,
-            fe.decision,
-            fe.score,
-            fe.flags_json,
-            fe.reason,
-            fe.blocked_by,
-            fe.allowed_by,
-            fe.trace_kind,
-            fe.search_request_id,
-            fe.search_query,
-            fe.search_rank,
-            fe.medium_threshold,
-            fe.block_threshold,
-            fe.bypassed,
-            fe.duration_ms,
-            fe.created_at,
-            src.request_id AS fallback_request_id,
-            src.query AS fallback_query,
-            src.search_rank AS fallback_rank
-          FROM fetch_events fe
-          LEFT JOIN search_results_cache src ON src.result_id = fe.result_id
-          WHERE fe.created_at >= ? AND fe.created_at <= ?
+            ${column} AS value,
+            COUNT(*) AS count
+          FROM filtered_events
+          WHERE ${column} IS NOT NULL AND TRIM(${column}) <> ''
+          GROUP BY ${column}
+          ORDER BY count DESC, value ASC
+          LIMIT ?
         `,
       )
-      .all(from, to) as Array<{
-      id: number
-      result_id: string
-      domain: string
-      url: string
-      decision: "allow" | "block"
-      score: number
-      flags_json: string
-      reason: string | null
-      blocked_by: string | null
-      allowed_by: string | null
-      trace_kind: string | null
-      search_request_id: string | null
-      search_query: string | null
-      search_rank: number | null
-      medium_threshold: number | null
-      block_threshold: number | null
-      bypassed: number
-      duration_ms: number
-      created_at: number
-      fallback_request_id: string | null
-      fallback_query: string | null
-      fallback_rank: number | null
-    }>
+      .all(...params, limit) as Array<{ value: string; count: number }>
 
     return rows.map((row) => ({
-      eventId: `fetch:${row.id}`,
-      source: "fetch",
+      value: row.value,
+      count: row.count,
+    }))
+  }
+
+  private mapDashboardEventRow(row: DashboardEventRow): DashboardEventRecord {
+    return {
+      eventId: row.event_id,
+      source: row.source,
       createdAt: row.created_at,
       resultId: row.result_id,
       decision: row.decision,
       domain: row.domain,
-      url: row.url || null,
+      url: row.url,
       reason: row.reason,
       blockedBy: row.blocked_by,
       allowedBy: row.allowed_by,
@@ -961,150 +1016,154 @@ export class AppDb {
       blockThreshold: row.block_threshold,
       bypassed: row.bypassed === 1,
       durationMs: row.duration_ms,
-      title: null,
-      query: row.search_query ?? row.fallback_query ?? null,
-      requestId: row.search_request_id ?? row.fallback_request_id ?? null,
-      traceKind: normalizeTraceKind(row.trace_kind, row.fallback_request_id),
-      searchRank: row.search_rank ?? row.fallback_rank ?? null,
-    }))
-  }
-
-  private getSearchBlockEventsInRange(from: number, to: number): DashboardEventRecord[] {
-    const rows = this.db
-      .prepare(
-        `
-          SELECT
-            id,
-            request_id,
-            result_id,
-            query,
-            url,
-            domain,
-            title,
-            reason,
-            created_at
-          FROM search_block_events
-          WHERE created_at >= ? AND created_at <= ?
-        `,
-      )
-      .all(from, to) as Array<{
-      id: number
-      request_id: string
-      result_id: string
-      query: string
-      url: string
-      domain: string
-      title: string
-      reason: string
-      created_at: number
-    }>
-
-    return rows.map((row) => ({
-      eventId: `search:${row.id}`,
-      source: "search",
-      createdAt: row.created_at,
-      resultId: row.result_id,
-      decision: "block",
-      domain: row.domain,
-      url: row.url,
-      reason: row.reason,
-      blockedBy: "domain-policy",
-      allowedBy: null,
-      flags: ["domain_blocklist"],
-      score: 0,
-      mediumThreshold: null,
-      blockThreshold: null,
-      bypassed: false,
-      durationMs: null,
       title: row.title,
       query: row.query,
       requestId: row.request_id,
-      traceKind: "unknown",
-      searchRank: null,
-    }))
+      traceKind: row.trace_kind,
+      searchRank: row.search_rank,
+    }
   }
 
-  private matchesDashboardFilters(
-    event: DashboardEventRecord,
-    query: DashboardEventsQuery,
-  ): boolean {
-    if (query.decision !== "all" && event.decision !== query.decision) {
-      return false
+  private buildDashboardFilteredDataset(
+    query: Omit<DashboardEventsQuery, "offset" | "limit">,
+  ): { cteSql: string; params: Array<string | number> } {
+    const sourceSelects: string[] = []
+    const params: Array<string | number> = []
+
+    if (query.source !== "search") {
+      sourceSelects.push(`
+        SELECT
+          'fetch:' || fe.id AS event_id,
+          'fetch' AS source,
+          fe.created_at,
+          fe.result_id,
+          fe.decision,
+          fe.domain,
+          NULLIF(fe.url, '') AS url,
+          fe.reason,
+          fe.blocked_by,
+          fe.allowed_by,
+          fe.flags_json,
+          fe.score,
+          fe.medium_threshold,
+          fe.block_threshold,
+          fe.bypassed,
+          fe.duration_ms,
+          NULL AS title,
+          COALESCE(fe.search_query, src.query) AS query,
+          COALESCE(fe.search_request_id, src.request_id) AS request_id,
+          CASE
+            WHEN fe.trace_kind = 'search-result-fetch' THEN 'search-result-fetch'
+            WHEN fe.trace_kind = 'direct-web-fetch' THEN 'direct-web-fetch'
+            WHEN src.request_id IS NOT NULL THEN 'search-result-fetch'
+            ELSE 'unknown'
+          END AS trace_kind,
+          COALESCE(fe.search_rank, src.search_rank) AS search_rank
+        FROM fetch_events fe
+        LEFT JOIN search_results_cache src ON src.result_id = fe.result_id
+        WHERE fe.created_at >= ? AND fe.created_at <= ?
+      `)
+      params.push(query.from, query.to)
+    }
+
+    if (query.source !== "fetch") {
+      sourceSelects.push(`
+        SELECT
+          'search:' || sbe.id AS event_id,
+          'search' AS source,
+          sbe.created_at,
+          sbe.result_id,
+          'block' AS decision,
+          sbe.domain,
+          sbe.url,
+          sbe.reason,
+          'domain-policy' AS blocked_by,
+          NULL AS allowed_by,
+          '["domain_blocklist"]' AS flags_json,
+          0 AS score,
+          NULL AS medium_threshold,
+          NULL AS block_threshold,
+          0 AS bypassed,
+          NULL AS duration_ms,
+          sbe.title,
+          sbe.query,
+          sbe.request_id,
+          'unknown' AS trace_kind,
+          NULL AS search_rank
+        FROM search_block_events sbe
+        WHERE sbe.created_at >= ? AND sbe.created_at <= ?
+      `)
+      params.push(query.from, query.to)
+    }
+
+    const whereClauses: string[] = []
+
+    if (query.decision !== "all") {
+      whereClauses.push(`decision = ?`)
+      params.push(query.decision)
     }
 
     if (query.domainContains) {
-      const needle = query.domainContains.toLowerCase()
-      if (!event.domain.toLowerCase().includes(needle)) {
-        return false
-      }
+      whereClauses.push(`LOWER(domain) LIKE ?`)
+      params.push(`%${query.domainContains.toLowerCase()}%`)
     }
 
     if (query.reasonContains) {
-      const needle = query.reasonContains.toLowerCase()
-      if (!(event.reason ?? "").toLowerCase().includes(needle)) {
-        return false
-      }
+      whereClauses.push(`LOWER(COALESCE(reason, '')) LIKE ?`)
+      params.push(`%${query.reasonContains.toLowerCase()}%`)
     }
 
     if (query.flagContains) {
-      const needle = query.flagContains.toLowerCase()
-      const hasFlag = event.flags.some((flag) => flag.toLowerCase().includes(needle))
-      if (!hasFlag) {
-        return false
-      }
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1
+          FROM json_each(flags_json) AS flags
+          WHERE LOWER(CAST(flags.value AS TEXT)) LIKE ?
+        )
+      `)
+      params.push(`%${query.flagContains.toLowerCase()}%`)
     }
 
     if (query.allowedByContains) {
-      const needle = query.allowedByContains.toLowerCase()
-      if (!(event.allowedBy ?? "").toLowerCase().includes(needle)) {
-        return false
-      }
+      whereClauses.push(`LOWER(COALESCE(allowed_by, '')) LIKE ?`)
+      params.push(`%${query.allowedByContains.toLowerCase()}%`)
     }
 
     if (query.queryContains) {
-      const needle = query.queryContains.toLowerCase()
-      if (!(event.query ?? "").toLowerCase().includes(needle)) {
-        return false
-      }
+      whereClauses.push(`LOWER(COALESCE(query, '')) LIKE ?`)
+      params.push(`%${query.queryContains.toLowerCase()}%`)
     }
 
-    if (query.traceKind && event.traceKind !== query.traceKind) {
-      return false
+    if (query.traceKind) {
+      whereClauses.push(`trace_kind = ?`)
+      params.push(query.traceKind)
     }
 
     if (query.minSearchRank !== undefined) {
-      if (event.searchRank === null || event.searchRank < query.minSearchRank) {
-        return false
-      }
+      whereClauses.push(`search_rank IS NOT NULL AND search_rank >= ?`)
+      params.push(query.minSearchRank)
     }
 
     if (query.maxSearchRank !== undefined) {
-      if (event.searchRank === null || event.searchRank > query.maxSearchRank) {
-        return false
-      }
+      whereClauses.push(`search_rank IS NOT NULL AND search_rank <= ?`)
+      params.push(query.maxSearchRank)
     }
 
-    return true
-  }
+    const filteredWhere =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.map((clause) => `(${clause.trim()})`).join(" AND ")}` : ""
 
-  private getTopItems(
-    events: DashboardEventRecord[],
-    picker: (event: DashboardEventRecord) => string | null,
-    limit: number,
-  ): DashboardTopItem[] {
-    const counter = new Map<string, number>()
-    for (const event of events) {
-      const value = picker(event)?.trim()
-      if (!value) {
-        continue
-      }
-      counter.set(value, (counter.get(value) ?? 0) + 1)
-    }
+    const cteSql = `
+      WITH events AS (
+        ${sourceSelects.join("\nUNION ALL\n")}
+      ),
+      filtered_events AS (
+        SELECT *
+        FROM events
+        ${filteredWhere}
+      )
+    `
 
-    return [...counter.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, limit)
-      .map(([value, count]) => ({ value, count }))
+    return { cteSql, params }
   }
 }
 
@@ -1188,5 +1247,28 @@ function isValidDomainEntry(domain: string): boolean {
     return false
   }
 
-  return /^[a-z0-9.-]+$/.test(domain)
+  if (!/^[a-z0-9.-]+$/.test(domain)) {
+    return false
+  }
+
+  if (domain.startsWith(".") || domain.endsWith(".")) {
+    return false
+  }
+
+  const labels = domain.split(".")
+  if (labels.length === 0) {
+    return false
+  }
+
+  for (const label of labels) {
+    if (!label || label.length > 63) {
+      return false
+    }
+
+    if (label.startsWith("-") || label.endsWith("-")) {
+      return false
+    }
+  }
+
+  return true
 }

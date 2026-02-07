@@ -30,6 +30,7 @@ function mockConfig(): AppConfig {
     allowlistDomains: [],
     blocklistDomains: [],
     languageNameAllowlistExtra: [],
+    enableDashboardWriteApi: false,
     dbPath: "./data/test.db",
     logDir: "./data/logs",
     resultTtlMs: 600_000,

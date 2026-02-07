@@ -90,3 +90,13 @@ test("parses safe content URL exposure toggle", () => {
 
   expect(config.exposeSafeContentUrls).toBe(false)
 })
+
+test("parses dashboard write API toggle", () => {
+  const enabledByDefault = loadConfig({})
+  const disabled = loadConfig({
+    CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API: "false",
+  })
+
+  expect(enabledByDefault.enableDashboardWriteApi).toBe(true)
+  expect(disabled.enableDashboardWriteApi).toBe(false)
+})

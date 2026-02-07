@@ -7,6 +7,7 @@ A Bun-based secure proxy for OpenClaw web access via Brave Search.
 - Opaque result ID fetch flow (`/v1/fetch`)
 - OpenClaw-style direct URL fetch flow (`/v1/web-fetch`)
 - Human investigator dashboard (`/dashboard`)
+- Separate liveness (`/healthz`) and readiness (`/readyz`) probes
 - Domain allowlist + blocklist support
 - Runtime allowlist updates from dashboard/API
 - Prompt-injection rule scoring and fail-closed policy
@@ -42,19 +43,39 @@ bun run dev
 
 Server runs on `http://localhost:3000` by default.
 
+## Configuration Presets
+This repo now includes tiered env presets:
+- `env-presets/.env.easy.example` for easiest local/dev workflow.
+- `env-presets/.env.secure.example` for hardened self-hosted usage.
+- `env-presets/.env.public.example` for internet-exposed deployments without app auth.
+
+Use one preset as your starting point:
+```bash
+cp env-presets/.env.easy.example .env
+# or:
+cp env-presets/.env.secure.example .env
+# or:
+cp env-presets/.env.public.example .env
+```
+
+Then set required secrets such as `CLAWRUBBER_BRAVE_API_KEY`.
+
 ## Endpoints
 - `POST /v1/search`
 - `POST /v1/fetch`
 - `POST /v1/web-fetch`
 - `GET /healthz`
+- `GET /readyz`
 - `GET /dashboard`
 - `GET /v1/dashboard/overview`
 - `GET /v1/dashboard/events`
+- `GET /v1/dashboard/traces`
 - `GET /v1/dashboard/events/:id`
 - `GET /v1/dashboard/timeseries`
 - `GET /v1/dashboard/top-domains`
 - `GET /v1/dashboard/top-flags`
 - `GET /v1/dashboard/top-reasons`
+- `GET /v1/dashboard/top-allowed-by`
 - `GET /v1/dashboard/allowlist`
 - `POST /v1/dashboard/allowlist`
 
@@ -85,6 +106,21 @@ Runtime allowlist behavior:
 - Added domains are persisted in SQLite and applied immediately.
 - Blocklist still has highest precedence (blocklist always wins).
 - Environment allowlist (`CLAWRUBBER_ALLOWLIST_DOMAINS`) remains active and is merged with runtime entries.
+- `POST /v1/dashboard/allowlist` is enabled by default; set
+  `CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API=false` when exposed outside trusted networks.
+
+## Security Hardening
+If you want the most secure setup, use `env-presets/.env.secure.example` or
+`env-presets/.env.public.example`, then apply these controls:
+- Keep `CLAWRUBBER_PROFILE=paranoid`.
+- Keep `CLAWRUBBER_FAIL_CLOSED=true`.
+- Keep `CLAWRUBBER_REDACT_URLS=true`.
+- Set `CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS=false`.
+- Set `CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API=false`.
+- Keep `CLAWRUBBER_WEBSITE_RENDERER_BACKEND=none` unless you truly need Browserless.
+- If Browserless is required, isolate it on a private network and set a token.
+- Restrict network access to dashboard routes using firewall/reverse proxy rules.
+- Monitor `GET /readyz` and treat non-200 as not ready.
 
 ## Web Fetch Compatibility
 `/v1/web-fetch` is the OpenClaw-style direct fetch endpoint.
@@ -109,6 +145,10 @@ Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to inclu
 Successful full-content responses (`/v1/fetch` and `/v1/web-fetch`) include vetted `url` and `final_url` by default.
 Set `CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS=false` to hide these URL fields.
 
+## Health Checks
+- `GET /healthz`: liveness probe (process up).
+- `GET /readyz`: readiness probe with config/dependency checks, returns `503` when not ready.
+
 ## Brave Rate Limiting
 Brave requests are rate-limited through an internal queue to avoid 429s under burst traffic.
 
@@ -128,6 +168,7 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 - Default behavior uses plain HTTP fetches.
 - Set `CLAWRUBBER_WEBSITE_RENDERER_BACKEND=browserless` to fetch rendered HTML through Browserless.
 - If Browserless is enabled and `CLAWRUBBER_BROWSERLESS_FALLBACK_TO_HTTP=true`, failed render attempts fall back to plain fetch.
+- Browserless mode pre-resolves redirect chains and re-checks final domains against policy.
 - Run Browserless in an isolated network context; treat it as a high-privilege fetcher.
 
 ## Environment Variables
@@ -137,11 +178,13 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 - `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429=true|false` (default `true`)
 - `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX` (default `1`)
 - `CLAWRUBBER_PROFILE=baseline|strict|paranoid`
+- `HOST` (default `0.0.0.0`; use `127.0.0.1` for localhost-only binding)
 - `CLAWRUBBER_REDACT_URLS=true|false`
 - `CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS=true|false` (default `true`)
 - `CLAWRUBBER_FAIL_CLOSED=true|false`
 - `CLAWRUBBER_ALLOWLIST_DOMAINS=example.com,docs.example.com`
 - `CLAWRUBBER_BLOCKLIST_DOMAINS=bad.example`
+- `CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API=true|false` (default `true`)
 - `CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA=Euskalki Berezia,tlhIngan Hol`
 - `CLAWRUBBER_DB_PATH` (default `./data/claw-rubber.db`)
 - `CLAWRUBBER_LOG_DIR` (default `./data/logs`)
@@ -166,7 +209,7 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 bun test
 ```
 
-Integration tests (not run by default):
+Manual integration tests (not run by default, intended for local setup validation):
 ```bash
 # 1) Fill in one file with your proxy/auth/test targets:
 #    test/integration/config.ts

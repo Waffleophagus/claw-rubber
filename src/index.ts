@@ -17,6 +17,7 @@ import {
 } from "./routes/dashboard"
 import { handleFetch } from "./routes/fetch"
 import { handleHealthz } from "./routes/healthz"
+import { handleReadyz } from "./routes/readyz"
 import { handleSearch } from "./routes/search"
 import { handleWebFetch } from "./routes/web-fetch"
 import type { ServerContext } from "./server-context"
@@ -69,6 +70,8 @@ const server = Bun.serve({
 
     if (pathname === "/healthz") {
       response = handleHealthz(request, ctx)
+    } else if (pathname === "/readyz") {
+      response = handleReadyz(request, ctx)
     } else if (pathname === "/v1/search") {
       if (request.method !== "POST") {
         response = errorResponse(405, "Method not allowed")
@@ -167,6 +170,17 @@ const server = Bun.serve({
   },
 })
 
+if (config.enableDashboardWriteApi && isNonLoopbackHost(config.host)) {
+  loggers.security.warn(
+    {
+      host: config.host,
+      port: config.port,
+      enableDashboardWriteApi: config.enableDashboardWriteApi,
+    },
+    "dashboard write API is enabled on a non-loopback host; restrict network access or disable writes",
+  )
+}
+
 loggers.app.info(
   {
     host: server.hostname,
@@ -185,3 +199,8 @@ loggers.app.info(
 )
 
 console.log(`claw-rubber listening on http://${server.hostname}:${server.port}`)
+
+function isNonLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase()
+  return !["127.0.0.1", "::1", "localhost"].includes(normalized)
+}
