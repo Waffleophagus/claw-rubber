@@ -44,6 +44,7 @@ export interface SearchResultResponse {
 export interface InjectionScore {
   score: number;
   flags: string[];
+  allowSignals?: string[];
   normalizationApplied?: string[];
   obfuscationSignals?: string[];
   evidence?: EvidenceMatch[];

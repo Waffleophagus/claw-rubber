@@ -2,9 +2,23 @@ export interface NormalizationResult {
   normalizedText: string;
   transformations: string[];
   signalFlags: string[];
+  confusableAnalysis: {
+    totalTokens: number;
+    mappedCount: number;
+    suspiciousTokens: Array<{
+      token: string;
+      start: number;
+      end: number;
+      confusableCount: number;
+    }>;
+  };
 }
 
 const CONTROL_OR_INVISIBLE_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g;
+const TOKEN_RE = /[\p{L}\p{M}\p{N}_-]+/gu;
+const LATIN_SCRIPT_RE = /\p{Script=Latin}/u;
+const CYRILLIC_SCRIPT_RE = /\p{Script=Cyrillic}/u;
+const GREEK_SCRIPT_RE = /\p{Script=Greek}/u;
 
 // High-risk confusables frequently used in mixed-script obfuscation attempts.
 const CONFUSABLES: Record<string, string> = {
@@ -72,6 +86,50 @@ function collapseRepeatedCharacters(input: string): string {
   return input.replace(/([a-zA-Z])\1{3,}/g, "$1$1");
 }
 
+function detectConfusableMixedScriptTokens(input: string): {
+  totalTokens: number;
+  suspiciousTokens: Array<{ token: string; start: number; end: number; confusableCount: number }>;
+} {
+  const suspiciousTokens: Array<{ token: string; start: number; end: number; confusableCount: number }> = [];
+  let totalTokens = 0;
+
+  for (const match of input.matchAll(TOKEN_RE)) {
+    const token = match[0];
+    const start = match.index;
+    if (!token || start === undefined) {
+      continue;
+    }
+
+    totalTokens += 1;
+    let hasLatin = false;
+    let confusableCount = 0;
+
+    for (const char of token) {
+      if (LATIN_SCRIPT_RE.test(char)) {
+        hasLatin = true;
+      }
+
+      if (
+        CONFUSABLES[char] &&
+        (CYRILLIC_SCRIPT_RE.test(char) || GREEK_SCRIPT_RE.test(char))
+      ) {
+        confusableCount += 1;
+      }
+    }
+
+    if (hasLatin && confusableCount > 0) {
+      suspiciousTokens.push({
+        token,
+        start,
+        end: start + token.length,
+        confusableCount,
+      });
+    }
+  }
+
+  return { totalTokens, suspiciousTokens };
+}
+
 export function normalizeForSecurity(input: string): NormalizationResult {
   const transformations: string[] = [];
   const signalFlags: string[] = [];
@@ -97,11 +155,14 @@ export function normalizeForSecurity(input: string): NormalizationResult {
     text = decodedEntities;
   }
 
+  const confusableTokenAnalysis = detectConfusableMixedScriptTokens(text);
   const confusableResult = mapConfusables(text);
   if (confusableResult.replacedCount > 0) {
-    signalFlags.push("confusable_mixed_script");
     transformations.push("map_confusables");
     text = confusableResult.text;
+  }
+  if (confusableTokenAnalysis.suspiciousTokens.length > 0) {
+    signalFlags.push("confusable_mixed_script");
   }
 
   const collapsedPunctuation = text.replace(/[._\-:/\\|]{2,}/g, " ");
@@ -136,5 +197,10 @@ export function normalizeForSecurity(input: string): NormalizationResult {
     normalizedText: text,
     transformations: [...new Set(transformations)],
     signalFlags: [...new Set(signalFlags)],
+    confusableAnalysis: {
+      totalTokens: confusableTokenAnalysis.totalTokens,
+      mappedCount: confusableResult.replacedCount,
+      suspiciousTokens: confusableTokenAnalysis.suspiciousTokens,
+    },
   };
 }

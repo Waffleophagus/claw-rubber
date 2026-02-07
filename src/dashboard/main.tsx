@@ -28,6 +28,7 @@ interface DashboardEvent {
   url: string | null;
   reason: string | null;
   blockedBy: string | null;
+  allowedBy: string | null;
   flags: string[];
   score: number;
   mediumThreshold: number | null;
@@ -68,6 +69,7 @@ interface OverviewPayload {
     search: number;
   };
   topBlockedBy: string | null;
+  topAllowedBy: string | null;
 }
 
 interface TimeseriesPoint {
@@ -92,6 +94,7 @@ interface FilterState {
   domain: string;
   reason: string;
   flag: string;
+  allowedBy: string;
 }
 
 function App() {
@@ -106,6 +109,7 @@ function App() {
       domain: "",
       reason: "",
       flag: "",
+      allowedBy: "",
     };
   }, []);
 
@@ -340,6 +344,11 @@ function App() {
               value={draftFilters.flag}
               onChange={(event) => setDraftFilters((current) => ({ ...current, flag: event.target.value }))}
             />
+            <Input
+              placeholder="Allowed-by contains..."
+              value={draftFilters.allowedBy}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, allowedBy: event.target.value }))}
+            />
             <div className="flex gap-2">
               <Button onClick={applyFilters}>Apply</Button>
               <Button variant="outline" onClick={resetFilters}>
@@ -373,6 +382,12 @@ function App() {
             value={humanBlockedBy(overview?.topBlockedBy ?? null)}
             subtitle="most common block classification"
             icon={<AlertTriangle className="h-4 w-4 text-slate-700" />}
+          />
+          <MetricCard
+            title="Primary Allow Exception"
+            value={humanAllowedBy(overview?.topAllowedBy ?? null)}
+            subtitle="most common allow-exception path"
+            icon={<ShieldCheck className="h-4 w-4 text-emerald-700" />}
           />
         </section>
 
@@ -477,7 +492,7 @@ function App() {
                     <TableHead>Time</TableHead>
                     <TableHead>Domain</TableHead>
                     <TableHead>Source</TableHead>
-                    <TableHead>Blocked By</TableHead>
+                    <TableHead>Classification</TableHead>
                     <TableHead>Score / Level</TableHead>
                     <TableHead>Rule Signals</TableHead>
                     <TableHead>Reason</TableHead>
@@ -506,7 +521,7 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Badge variant={event.decision === "block" ? "danger" : "success"}>
-                            {humanBlockedBy(event.blockedBy)}
+                            {humanEventCategory(event)}
                           </Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{formatScore(event)}</TableCell>
@@ -583,7 +598,7 @@ function App() {
                 <DetailRow label="Event ID" value={selectedEvent.eventId} mono />
                 <DetailRow label="Time" value={formatDateTime(selectedEvent.createdAt)} />
                 <DetailRow label="Decision" value={selectedEvent.decision} />
-                <DetailRow label="Blocked by" value={humanBlockedBy(selectedEvent.blockedBy)} />
+                <DetailRow label="Classification" value={humanEventCategory(selectedEvent)} />
                 <DetailRow label="Domain" value={selectedEvent.domain} mono />
                 <DetailRow label="URL" value={selectedEvent.url ?? "--"} />
                 <DetailRow label="Reason" value={selectedEvent.reason ?? "--"} />
@@ -720,6 +735,9 @@ function buildBaseParams(filters: FilterState): URLSearchParams {
   if (filters.flag.trim()) {
     params.set("flag", filters.flag.trim());
   }
+  if (filters.allowedBy.trim()) {
+    params.set("allowed_by", filters.allowedBy.trim());
+  }
   return params;
 }
 
@@ -745,6 +763,25 @@ function humanBlockedBy(value: string | null): string {
     default:
       return "n/a";
   }
+}
+
+function humanAllowedBy(value: string | null): string {
+  switch (value) {
+    case "domain-allowlist-bypass":
+      return "Domain allowlist bypass";
+    case "language-exception":
+      return "Language exception";
+    default:
+      return "n/a";
+  }
+}
+
+function humanEventCategory(event: Pick<DashboardEvent, "decision" | "blockedBy" | "allowedBy">): string {
+  if (event.decision === "block") {
+    return humanBlockedBy(event.blockedBy);
+  }
+
+  return humanAllowedBy(event.allowedBy);
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

@@ -17,4 +17,5 @@ test("normalizer maps common mixed-script confusables", () => {
 
   expect(normalized.normalizedText).toContain("ignore previous instructions");
   expect(normalized.signalFlags.includes("confusable_mixed_script")).toBe(true);
+  expect(normalized.confusableAnalysis.suspiciousTokens.length).toBeGreaterThanOrEqual(1);
 });

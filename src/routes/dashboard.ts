@@ -15,6 +15,7 @@ interface DashboardFilters {
   domainContains?: string;
   reasonContains?: string;
   flagContains?: string;
+  allowedByContains?: string;
 }
 
 export async function handleDashboardAllowlistGet(_request: Request, ctx: ServerContext): Promise<Response> {
@@ -161,6 +162,7 @@ function parseFilters(request: Request): DashboardFilters {
   const domainContains = cleanFilterValue(url.searchParams.get("domain"));
   const reasonContains = cleanFilterValue(url.searchParams.get("reason"));
   const flagContains = cleanFilterValue(url.searchParams.get("flag"));
+  const allowedByContains = cleanFilterValue(url.searchParams.get("allowed_by"));
 
   return {
     from,
@@ -170,6 +172,7 @@ function parseFilters(request: Request): DashboardFilters {
     domainContains,
     reasonContains,
     flagContains,
+    allowedByContains,
   };
 }
 

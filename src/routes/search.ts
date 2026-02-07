@@ -3,7 +3,7 @@ import { evaluateDomainPolicy } from "../lib/domain-policy";
 import { errorResponse, jsonResponse, readJsonBody } from "../lib/http";
 import type { ServerContext } from "../server-context";
 import { QueueOverflowError } from "../services/rate-limiter";
-import type { SearchResultRecord, SearchResultResponse } from "../types";
+import type { SearchResultRecord, SearchResultResponse } from "../types.ts";
 
 const SearchRequestSchema = z.object({
   query: z.string().min(1).max(500),

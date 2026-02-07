@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import { normalizeDomain } from "./lib/domain-policy";
-import type { EvidenceMatch, SearchResultRecord } from "./types";
+import type { EvidenceMatch, SearchResultRecord } from "./types.ts";
 
 export interface FetchEventInput {
   resultId: string;
@@ -13,6 +13,7 @@ export interface FetchEventInput {
   flags: string[];
   reason: string | null;
   blockedBy: string | null;
+  allowedBy: string | null;
   domainAction: "allow-bypass" | "block" | "inspect";
   mediumThreshold: number;
   blockThreshold: number;
@@ -53,6 +54,7 @@ export interface DashboardEventsQuery {
   domainContains?: string;
   reasonContains?: string;
   flagContains?: string;
+  allowedByContains?: string;
   offset: number;
   limit: number;
 }
@@ -67,6 +69,7 @@ export interface DashboardEventRecord {
   url: string | null;
   reason: string | null;
   blockedBy: string | null;
+  allowedBy: string | null;
   flags: string[];
   score: number;
   mediumThreshold: number | null;
@@ -94,6 +97,7 @@ export interface DashboardOverview {
     search: number;
   };
   topBlockedBy: string | null;
+  topAllowedBy: string | null;
 }
 
 export interface DashboardTimeseriesPoint {
@@ -161,6 +165,7 @@ export class AppDb {
         flags_json TEXT NOT NULL,
         reason TEXT,
         blocked_by TEXT,
+        allowed_by TEXT,
         domain_action TEXT,
         medium_threshold INTEGER,
         block_threshold INTEGER,
@@ -214,6 +219,7 @@ export class AppDb {
 
     this.ensureColumn("fetch_events", "url", "TEXT NOT NULL DEFAULT ''");
     this.ensureColumn("fetch_events", "blocked_by", "TEXT");
+    this.ensureColumn("fetch_events", "allowed_by", "TEXT");
     this.ensureColumn("fetch_events", "domain_action", "TEXT");
     this.ensureColumn("fetch_events", "medium_threshold", "INTEGER");
     this.ensureColumn("fetch_events", "block_threshold", "INTEGER");
@@ -322,8 +328,8 @@ export class AppDb {
       `
         INSERT INTO fetch_events (
           result_id, url, domain, decision, score, flags_json, reason,
-          blocked_by, domain_action, medium_threshold, block_threshold, bypassed, duration_ms, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          blocked_by, allowed_by, domain_action, medium_threshold, block_threshold, bypassed, duration_ms, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     );
 
@@ -336,6 +342,7 @@ export class AppDb {
       JSON.stringify(event.flags),
       event.reason,
       event.blockedBy,
+      event.allowedBy,
       event.domainAction,
       event.mediumThreshold,
       event.blockThreshold,
@@ -453,6 +460,7 @@ export class AppDb {
       limit: Number.MAX_SAFE_INTEGER,
     });
     const blocked = events.filter((event) => event.decision === "block");
+    const allowed = events.filter((event) => event.decision === "allow");
     const uniqueBlockedDomains = new Set(blocked.map((event) => event.domain)).size;
 
     const blockedByCounts = new Map<string, number>();
@@ -472,6 +480,23 @@ export class AppDb {
       }
     }
 
+    const allowedByCounts = new Map<string, number>();
+    for (const event of allowed) {
+      if (!event.allowedBy) {
+        continue;
+      }
+      allowedByCounts.set(event.allowedBy, (allowedByCounts.get(event.allowedBy) ?? 0) + 1);
+    }
+
+    let topAllowedBy: string | null = null;
+    let topAllowedByCount = -1;
+    for (const [key, value] of allowedByCounts.entries()) {
+      if (value > topAllowedByCount) {
+        topAllowedBy = key;
+        topAllowedByCount = value;
+      }
+    }
+
     const bySource = {
       fetch: events.filter((event) => event.source === "fetch").length,
       search: events.filter((event) => event.source === "search").length,
@@ -485,6 +510,7 @@ export class AppDb {
       uniqueBlockedDomains,
       bySource,
       topBlockedBy,
+      topAllowedBy,
     };
   }
 
@@ -603,6 +629,7 @@ export class AppDb {
               flags_json,
               reason,
               blocked_by,
+              allowed_by,
               medium_threshold,
               block_threshold,
               bypassed,
@@ -623,6 +650,7 @@ export class AppDb {
             flags_json: string;
             reason: string | null;
             blocked_by: string | null;
+            allowed_by: string | null;
             medium_threshold: number | null;
             block_threshold: number | null;
             bypassed: number;
@@ -673,6 +701,7 @@ export class AppDb {
         url: fetchRow.url || null,
         reason: fetchRow.reason,
         blockedBy: fetchRow.blocked_by,
+        allowedBy: fetchRow.allowed_by,
         flags: parseFlags(fetchRow.flags_json),
         score: fetchRow.score,
         mediumThreshold: fetchRow.medium_threshold,
@@ -733,6 +762,7 @@ export class AppDb {
         url: searchRow.url,
         reason: searchRow.reason,
         blockedBy: "domain-policy",
+        allowedBy: null,
         flags: ["domain_blocklist"],
         score: 0,
         mediumThreshold: null,
@@ -801,6 +831,7 @@ export class AppDb {
             flags_json,
             reason,
             blocked_by,
+            allowed_by,
             medium_threshold,
             block_threshold,
             bypassed,
@@ -820,6 +851,7 @@ export class AppDb {
       flags_json: string;
       reason: string | null;
       blocked_by: string | null;
+      allowed_by: string | null;
       medium_threshold: number | null;
       block_threshold: number | null;
       bypassed: number;
@@ -837,6 +869,7 @@ export class AppDb {
       url: row.url || null,
       reason: row.reason,
       blockedBy: row.blocked_by,
+      allowedBy: row.allowed_by,
       flags: parseFlags(row.flags_json),
       score: row.score,
       mediumThreshold: row.medium_threshold,
@@ -889,6 +922,7 @@ export class AppDb {
       url: row.url,
       reason: row.reason,
       blockedBy: "domain-policy",
+      allowedBy: null,
       flags: ["domain_blocklist"],
       score: 0,
       mediumThreshold: null,
@@ -924,6 +958,13 @@ export class AppDb {
       const needle = query.flagContains.toLowerCase();
       const hasFlag = event.flags.some((flag) => flag.toLowerCase().includes(needle));
       if (!hasFlag) {
+        return false;
+      }
+    }
+
+    if (query.allowedByContains) {
+      const needle = query.allowedByContains.toLowerCase();
+      if (!(event.allowedBy ?? "").toLowerCase().includes(needle)) {
         return false;
       }
     }

@@ -71,3 +71,11 @@ test("throws when CLAWRUBBER_RATE_LIMIT is invalid", () => {
     CLAWRUBBER_RATE_LIMIT: "not-a-valid-rate-limit",
   })).toThrow();
 });
+
+test("parses extra language-name allowlist entries", () => {
+  const config = loadConfig({
+    CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA: "Klingon, tlhIngan Hol, Klingon",
+  });
+
+  expect(config.languageNameAllowlistExtra).toEqual(["klingon", "tlhingan hol"]);
+});

@@ -155,6 +155,7 @@ loggers.app.info(
     profile: config.profile,
     llmJudgeEnabled: config.llmJudgeEnabled,
     allowlistSize: config.allowlistDomains.length,
+    languageAllowlistExtraSize: config.languageNameAllowlistExtra.length,
     blocklistSize: config.blocklistDomains.length,
     websiteRendererBackend: config.websiteRendererBackend,
     braveRateLimitTier: config.braveRateLimit.tier,

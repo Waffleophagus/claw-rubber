@@ -11,6 +11,7 @@ A Bun-based secure proxy for OpenClaw web access via Brave Search.
 - Runtime allowlist updates from dashboard/API
 - Prompt-injection rule scoring and fail-closed policy
 - Obfuscation-aware detection (typoglycemia, confusables, escape/encoding signals)
+- Language-selector exception handling for benign multilingual lists (confusable signal only)
 - Optional model adjudication via Vercel AI SDK (OpenAI/Ollama)
 - Optional Browserless-rendered fetches for JavaScript-heavy pages
 - SQLite audit storage for flagged payloads
@@ -28,6 +29,7 @@ export CLAWRUBBER_BRAVE_API_KEY="..."
 export CLAWRUBBER_PROFILE="strict"
 export CLAWRUBBER_ALLOWLIST_DOMAINS="docs.bun.sh"
 export CLAWRUBBER_BLOCKLIST_DOMAINS="evil.example"
+export CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA="Klingon,tlhIngan Hol"
 export CLAWRUBBER_WEBSITE_RENDERER_BACKEND="none"
 export CLAWRUBBER_RATE_LIMIT="free"
 export CLAWRUBBER_BRAVE_QUEUE_MAX="10"
@@ -59,6 +61,7 @@ Server runs on `http://localhost:3000` by default.
 ## Investigator Dashboard
 The dashboard is designed for human false-positive investigation and policy tuning:
 - See why requests were blocked (reason, `blockedBy`, flags, score, thresholds)
+- Track allow-path exceptions (`allowedBy`) such as domain allowlist bypass and language exceptions
 - Review blocked fetch events and search domain blocks
 - Open event details including stored flagged payload content
 - Add domains to runtime allowlist without restarting the service
@@ -125,6 +128,7 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 - `CLAWRUBBER_FAIL_CLOSED=true|false`
 - `CLAWRUBBER_ALLOWLIST_DOMAINS=example.com,docs.example.com`
 - `CLAWRUBBER_BLOCKLIST_DOMAINS=bad.example`
+- `CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA=Euskalki Berezia,tlhIngan Hol`
 - `CLAWRUBBER_DB_PATH` (default `./data/claw-rubber.db`)
 - `CLAWRUBBER_LOG_DIR` (default `./data/logs`)
 - `CLAWRUBBER_RETENTION_DAYS` (default `30`)
@@ -150,9 +154,18 @@ bun test
 
 Integration tests (not run by default):
 ```bash
+# 1) Fill in one file with your proxy/auth/test targets:
+#    test/integration/config.ts
+#
+# 2) Run all integration tests:
+bun run test:integration
+#
+# Optional overrides without editing config.ts:
 bun run test:integration https://your-proxy-domain
-# optional bearer token as second argument:
 bun run test:integration https://your-proxy-domain YOUR_BEARER_TOKEN
+#
+# Run only web-fetch integration tests:
+bun test ./test/integration/web-fetch.integration.ts
 ```
 
 ## Docker

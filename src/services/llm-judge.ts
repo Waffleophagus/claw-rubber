@@ -4,7 +4,7 @@ import { createOllama } from "ollama-ai-provider";
 import { z } from "zod";
 import type pino from "pino";
 import type { AppConfig } from "../config";
-import type { JudgeResult } from "../types";
+import type { JudgeResult } from "../types.ts";
 
 const JudgeSchema = z.object({
   label: z.enum(["benign", "suspicious", "malicious"]),

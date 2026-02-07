@@ -1,5 +1,5 @@
 import type { AppConfig } from "../config";
-import type { JudgeResult, PolicyDecision } from "../types";
+import type { JudgeResult, PolicyDecision } from "../types.ts";
 
 export function decidePolicy(
   config: AppConfig,

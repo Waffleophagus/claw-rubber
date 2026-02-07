@@ -28,6 +28,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     failClosed: true,
     allowlistDomains: [],
     blocklistDomains: [],
+    languageNameAllowlistExtra: [],
     dbPath: "./data/test.db",
     logDir: "./data/logs",
     resultTtlMs: 600_000,

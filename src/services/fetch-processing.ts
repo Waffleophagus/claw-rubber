@@ -1,5 +1,5 @@
 import { evaluateDomainPolicy } from "../lib/domain-policy";
-import type { EvidenceMatch } from "../types";
+import type { EvidenceMatch } from "../types.ts";
 import type { ServerContext } from "../server-context";
 import { scorePromptInjection } from "./injection-rules";
 import { decidePolicy } from "./policy";
@@ -70,6 +70,7 @@ export async function processFetchedPage(
       flags: ["domain_blocklist"],
       reason: domainPolicy.reason ?? "Domain blocked",
       blockedBy: "domain-policy",
+      allowedBy: null,
       domainAction: domainPolicy.action,
       mediumThreshold: ctx.config.profileSettings.mediumThreshold,
       blockThreshold: ctx.config.profileSettings.blockThreshold,
@@ -119,12 +120,16 @@ export async function processFetchedPage(
   let flags: string[] = [];
   let normalizationApplied: string[] = [];
   let obfuscationSignals: string[] = [];
+  let allowSignals: string[] = [];
   let evidence: EvidenceMatch[] = [];
 
   if (domainPolicy.action === "inspect") {
-    const scored = scorePromptInjection(scoringText);
+    const scored = scorePromptInjection(scoringText, {
+      languageNameAllowlistExtra: ctx.config.languageNameAllowlistExtra,
+    });
     score = scored.score;
     flags = scored.flags;
+    allowSignals = scored.allowSignals ?? [];
     normalizationApplied = scored.normalizationApplied ?? [];
     obfuscationSignals = scored.obfuscationSignals ?? [];
     evidence = scored.evidence ?? [];
@@ -147,6 +152,12 @@ export async function processFetchedPage(
     judge,
   );
 
+  const allowedBy = classifyAllowedBy(
+    decision.decision,
+    decision.bypassed ?? false,
+    allowSignals,
+  );
+
   const fetchEventId = ctx.db.storeFetchEvent({
     resultId: input.eventId,
     url: input.url,
@@ -156,6 +167,7 @@ export async function processFetchedPage(
     flags: decision.flags,
     reason: decision.reason ?? null,
     blockedBy: classifyBlockedBy(decision.decision, decision.reason, decision.flags, domainPolicy.action),
+    allowedBy,
     domainAction: domainPolicy.action,
     mediumThreshold: ctx.config.profileSettings.mediumThreshold,
     blockThreshold: ctx.config.profileSettings.blockThreshold,
@@ -206,6 +218,21 @@ export async function processFetchedPage(
         obfuscation_signals: obfuscationSignals,
       },
     };
+  }
+
+  if (allowedBy) {
+    ctx.loggers.security.info(
+      {
+        eventId: input.eventId,
+        domain: input.domain,
+        allowedBy,
+        allowSignals,
+        suspiciousConfusableTokens: evidence
+          .filter((item) => item.flag === "confusable_mixed_script")
+          .map((item) => item.matchedText),
+      },
+      "allowed fetch due to exception pathway",
+    );
   }
 
   return {
@@ -260,4 +287,24 @@ function classifyBlockedBy(
   }
 
   return "policy";
+}
+
+function classifyAllowedBy(
+  decision: "allow" | "block",
+  bypassed: boolean,
+  allowSignals: string[],
+): string | null {
+  if (decision !== "allow") {
+    return null;
+  }
+
+  if (bypassed) {
+    return "domain-allowlist-bypass";
+  }
+
+  if (allowSignals.includes("language_exception")) {
+    return "language-exception";
+  }
+
+  return null;
 }

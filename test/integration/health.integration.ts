@@ -1,10 +1,10 @@
 import { expect } from "bun:test";
-import { integrationHeaders, integrationTest, integrationUrl } from "./helpers";
+import { integration } from "./helpers";
 
-integrationTest("integration: /healthz responds with status ok", async () => {
-  const response = await fetch(integrationUrl("/healthz"), {
+integration.test("integration: /healthz responds with status ok", async () => {
+  const response = await fetch(integration.url("/healthz"), {
     method: "GET",
-    headers: integrationHeaders(false),
+    headers: integration.headers(false),
   });
 
   expect(response.ok).toBe(true);

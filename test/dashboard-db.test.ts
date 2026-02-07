@@ -67,9 +67,11 @@ describe("dashboard db", () => {
       const db = new AppDb(path);
 
       const verifyDb = new Database(path, { strict: true });
+      const fetchColumns = verifyDb.prepare(`PRAGMA table_info(fetch_events)`).all() as Array<{ name: string }>;
       const columns = verifyDb.prepare(`PRAGMA table_info(flagged_payloads)`).all() as Array<{ name: string }>;
       const indexRows = verifyDb.prepare(`PRAGMA index_list(flagged_payloads)`).all() as Array<{ name: string }>;
 
+      expect(fetchColumns.some((column) => column.name === "allowed_by")).toBe(true);
       expect(columns.some((column) => column.name === "fetch_event_id")).toBe(true);
       expect(columns.some((column) => column.name === "evidence_json")).toBe(true);
       expect(indexRows.some((index) => index.name === "idx_flagged_payloads_fetch_event_id")).toBe(true);
@@ -83,6 +85,7 @@ describe("dashboard db", () => {
         flags: ["legacy_rule"],
         reason: "legacy migration test",
         blockedBy: "policy",
+        allowedBy: null,
         domainAction: "inspect",
         mediumThreshold: 6,
         blockThreshold: 10,
@@ -158,6 +161,7 @@ describe("dashboard db", () => {
         flags: ["instruction_override", "exfiltration"],
         reason: "Rule score 13 >= block threshold 10",
         blockedBy: "rule-threshold",
+        allowedBy: null,
         domainAction: "inspect",
         mediumThreshold: 6,
         blockThreshold: 10,
@@ -226,6 +230,7 @@ describe("dashboard db", () => {
         flags: ["low_risk_reference"],
         reason: null,
         blockedBy: null,
+        allowedBy: "language-exception",
         domainAction: "inspect",
         mediumThreshold: 6,
         blockThreshold: 10,
@@ -242,6 +247,7 @@ describe("dashboard db", () => {
         flags: ["tool_abuse", "llm_judge:suspicious"],
         reason: "Fail-closed: rule score 8 >= medium threshold 6",
         blockedBy: "fail-closed",
+        allowedBy: null,
         domainAction: "inspect",
         mediumThreshold: 6,
         blockThreshold: 10,
@@ -270,6 +276,22 @@ describe("dashboard db", () => {
       });
       expect(flagged.total).toBe(1);
       expect(flagged.events[0]?.domain).toBe("bad.example");
+
+      const allowedByLanguage = db.getDashboardEvents({
+        ...baseQuery,
+        decision: "allow",
+        allowedByContains: "language",
+      });
+      expect(allowedByLanguage.total).toBe(1);
+      expect(allowedByLanguage.events[0]?.allowedBy).toBe("language-exception");
+
+      const overview = db.getDashboardOverview({
+        from: now - 60_000,
+        to: now + 60_000,
+        source: "all",
+        decision: "all",
+      });
+      expect(overview.topAllowedBy).toBe("language-exception");
     } finally {
       cleanupDb(path);
     }

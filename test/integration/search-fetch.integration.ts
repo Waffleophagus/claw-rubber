@@ -1,5 +1,5 @@
 import { expect } from "bun:test";
-import { integrationHeaders, integrationTest, integrationUrl } from "./helpers";
+import { integration } from "./helpers";
 
 interface SearchResult {
   result_id: string;
@@ -11,12 +11,12 @@ interface SearchResponse {
   results: SearchResult[];
 }
 
-integrationTest("integration: /v1/search then /v1/fetch roundtrip", async () => {
-  const searchResponse = await fetch(integrationUrl("/v1/search"), {
+integration.test("integration: /v1/search then /v1/fetch roundtrip", async () => {
+  const searchResponse = await fetch(integration.url("/v1/search"), {
     method: "POST",
-    headers: integrationHeaders(),
+    headers: integration.headers(),
     body: JSON.stringify({
-      query: "bun runtime docs",
+      query: integration.config.searchQuery,
       count: 5,
       safesearch: "moderate",
     }),
@@ -32,9 +32,9 @@ integrationTest("integration: /v1/search then /v1/fetch roundtrip", async () => 
   const allowedResult = searchPayload.results.find((result) => result.availability === "allowed");
   expect(allowedResult).toBeDefined();
 
-  const fetchResponse = await fetch(integrationUrl("/v1/fetch"), {
+  const fetchResponse = await fetch(integration.url("/v1/fetch"), {
     method: "POST",
-    headers: integrationHeaders(),
+    headers: integration.headers(),
     body: JSON.stringify({
       result_id: allowedResult!.result_id,
     }),

@@ -1,5 +1,6 @@
-import type { EvidenceBasis, EvidenceDetector, EvidenceMatch, InjectionScore } from "../types";
+import type { EvidenceBasis, EvidenceDetector, EvidenceMatch, InjectionScore } from "../types.ts";
 import { detectEncodingObfuscationSignals } from "./encoding-signals";
+import { detectLanguageList } from "./language-list-detector";
 import { normalizeForSecurity } from "./obfuscation-normalizer";
 import { detectTypoglycemiaSignals } from "./typoglycemia";
 
@@ -72,11 +73,27 @@ const NORMALIZATION_SIGNAL_SCORES: Record<string, number> = {
   confusable_mixed_script: 3,
 };
 const INVISIBLE_OR_BIDI_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g;
-const NON_ASCII_TOKEN_RE = /\S*[^\x00-\x7F]\S*/g;
 
-export function scorePromptInjection(content: string): InjectionScore {
+const HIGH_RISK_INTENT_FLAGS = new Set<string>([
+  "instruction_override",
+  "role_hijack",
+  "prompt_exfiltration",
+  "secret_exfiltration",
+  "tool_abuse",
+  "jailbreak_marker",
+  "urgent_manipulation",
+  "typoglycemia_high_risk_keyword",
+  "decode_instruction_context",
+]);
+
+interface ScorePromptInjectionOptions {
+  languageNameAllowlistExtra?: string[];
+}
+
+export function scorePromptInjection(content: string, options: ScorePromptInjectionOptions = {}): InjectionScore {
   const normalized = normalizeForSecurity(content);
   const flags = new Set<string>();
+  const allowSignals = new Set<string>();
   const evidence: EvidenceMatch[] = [];
   let score = 0;
 
@@ -102,6 +119,10 @@ export function scorePromptInjection(content: string): InjectionScore {
   }
 
   for (const signal of normalized.signalFlags) {
+    if (signal === "confusable_mixed_script") {
+      continue;
+    }
+
     const signalWeight = NORMALIZATION_SIGNAL_SCORES[signal];
     if (signalWeight !== undefined) {
       score += signalWeight;
@@ -155,6 +176,28 @@ export function scorePromptInjection(content: string): InjectionScore {
     }
   }
 
+  const hasHighRiskIntent = [...flags].some((flag) => HIGH_RISK_INTENT_FLAGS.has(flag));
+  const hasSuspiciousConfusableTokens = normalized.confusableAnalysis.suspiciousTokens.length > 0;
+  const hasConfusableMappings = normalized.confusableAnalysis.mappedCount > 0;
+  const languageList = hasConfusableMappings
+    ? detectLanguageList(content, options.languageNameAllowlistExtra ?? [])
+    : null;
+
+  if (languageList?.isLanguageListLikely) {
+    allowSignals.add("language_exception");
+  }
+
+  if (hasSuspiciousConfusableTokens) {
+    if (!languageList?.isLanguageListLikely && hasHighRiskIntent) {
+      const confusableWeight = NORMALIZATION_SIGNAL_SCORES.confusable_mixed_script ?? 0;
+      if (confusableWeight > 0) {
+        score += confusableWeight;
+      }
+      flags.add("confusable_mixed_script");
+      evidence.push(...collectConfusableEvidence(normalized.confusableAnalysis.suspiciousTokens, confusableWeight));
+    }
+  }
+
   const allFlags = [...flags];
   const obfuscationSignals = allFlags.filter((flag) =>
     flag.startsWith("typoglycemia") ||
@@ -168,6 +211,7 @@ export function scorePromptInjection(content: string): InjectionScore {
   return {
     score,
     flags: allFlags,
+    allowSignals: [...allowSignals],
     normalizationApplied: normalized.transformations,
     obfuscationSignals,
     evidence: finalizeEvidence(evidence, 20),
@@ -267,38 +311,25 @@ function collectNormalizationEvidence(
     }));
   }
 
-  if (signal === "confusable_mixed_script") {
-    const rawMatches = collectRegexMatches(rawText, NON_ASCII_TOKEN_RE, 4);
-    if (rawMatches.length > 0) {
-      return rawMatches.map((match) => buildEvidence({
-        flag: signal,
-        detector: "normalization",
-        basis: "raw",
-        start: match.start,
-        end: match.end,
-        matchedText: match.text,
-        contextText: rawText,
-        weight,
-        notes: "Token contains mixed/confusable characters",
-      }));
-    }
-
-    return [
-      buildEvidence({
-        flag: signal,
-        detector: "normalization",
-        basis: "normalized",
-        start: null,
-        end: null,
-        matchedText: normalizedText.slice(0, 200),
-        contextText: normalizedText,
-        weight,
-        notes: "Detected during normalization",
-      }),
-    ];
-  }
-
   return [];
+}
+
+function collectConfusableEvidence(
+  suspiciousTokens: Array<{ token: string; confusableCount: number }>,
+  weight: number,
+): EvidenceMatch[] {
+  return suspiciousTokens.slice(0, 4).map((token) =>
+    buildEvidence({
+      flag: "confusable_mixed_script",
+      detector: "normalization",
+      basis: "normalized",
+      start: null,
+      end: null,
+      matchedText: token.token,
+      contextText: token.token,
+      weight,
+      notes: `Mixed-script token with ${token.confusableCount} confusable character(s)`,
+    }));
 }
 
 function finalizeEvidence(evidence: EvidenceMatch[], maxItems: number): EvidenceMatch[] {

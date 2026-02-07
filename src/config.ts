@@ -45,6 +45,7 @@ export interface AppConfig {
   failClosed: boolean;
   allowlistDomains: string[];
   blocklistDomains: string[];
+  languageNameAllowlistExtra: string[];
   dbPath: string;
   logDir: string;
   resultTtlMs: number;
@@ -124,6 +125,7 @@ const EnvSchema = z.object({
   CLAWRUBBER_FAIL_CLOSED: z.string().optional(),
   CLAWRUBBER_ALLOWLIST_DOMAINS: z.string().optional(),
   CLAWRUBBER_BLOCKLIST_DOMAINS: z.string().optional(),
+  CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA: z.string().optional(),
   CLAWRUBBER_DB_PATH: z.string().default("./data/claw-rubber.db"),
   CLAWRUBBER_LOG_DIR: z.string().default("./data/logs"),
   CLAWRUBBER_RESULT_TTL_MINUTES: z.string().optional(),
@@ -193,6 +195,19 @@ function parseDomainList(input: string | undefined): string[] {
     .filter((item) => item.length > 0))];
 }
 
+function parseLanguageNameList(input: string | undefined): string[] {
+  if (!input) {
+    return [];
+  }
+
+  return [...new Set(input
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .map((item) => item.normalize("NFKC").toLowerCase())
+    .filter((item) => item.length > 1 && item.length <= 80))];
+}
+
 export function loadConfig(env = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
   const profileSettings = profiles[parsed.CLAWRUBBER_PROFILE];
@@ -225,6 +240,7 @@ export function loadConfig(env = process.env): AppConfig {
     failClosed: toBoolean(parsed.CLAWRUBBER_FAIL_CLOSED, true),
     allowlistDomains: parseDomainList(parsed.CLAWRUBBER_ALLOWLIST_DOMAINS),
     blocklistDomains: parseDomainList(parsed.CLAWRUBBER_BLOCKLIST_DOMAINS),
+    languageNameAllowlistExtra: parseLanguageNameList(parsed.CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA),
     dbPath: parsed.CLAWRUBBER_DB_PATH,
     logDir: parsed.CLAWRUBBER_LOG_DIR,
     resultTtlMs: toInteger(parsed.CLAWRUBBER_RESULT_TTL_MINUTES, 30) * 60 * 1000,
