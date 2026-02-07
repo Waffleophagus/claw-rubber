@@ -12,7 +12,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN mkdir -p /data/logs
+RUN mkdir -p /data/logs && chown -R bun:bun /data
 USER bun
 
 EXPOSE 3000
