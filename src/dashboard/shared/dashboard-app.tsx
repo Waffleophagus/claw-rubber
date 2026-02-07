@@ -17,7 +17,6 @@ import {
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import * as Tooltip from "@radix-ui/react-tooltip";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 
@@ -156,9 +155,9 @@ const FLAG_FILTER_PRESETS: FlagFilterPreset[] = [
 export function DashboardApp({ variant }: { variant: DashboardVariant }) {
   const now = useMemo(() => new Date(), []);
   const isSignalForge = variant === "v1";
-  const [tooltipContainer, setTooltipContainer] = useState<HTMLDivElement | null>(null);
   const [themeMode, setThemeMode] = useState<SignalForgeThemeMode>("system");
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  const [isFlagHelpOpen, setIsFlagHelpOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     from: toDatetimeLocalValue(new Date(now.getTime() - 24 * 60 * 60 * 1000)),
     to: toDatetimeLocalValue(now),
@@ -259,6 +258,23 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
   }, [selectedId, loadDetail]);
 
   useEffect(() => {
+    if (!isFlagHelpOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFlagHelpOpen(false);
+      }
+    };
+
+    globalThis.addEventListener("keydown", onKeyDown);
+    return () => {
+      globalThis.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isFlagHelpOpen]);
+
+  useEffect(() => {
     if (!isSignalForge) {
       return;
     }
@@ -325,10 +341,7 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
     : "light";
 
   return (
-    <div
-      ref={setTooltipContainer}
-      className={`trace-dashboard trace-dashboard-${variant}${isSignalForge ? ` trace-theme-${effectiveTheme}` : ""}`}
-    >
+    <div className={`trace-dashboard trace-dashboard-${variant}${isSignalForge ? ` trace-theme-${effectiveTheme}` : ""}`}>
       <header className="trace-hero">
         <div>
           <p className="trace-hero-kicker">{copy.tone} Trace Model</p>
@@ -440,42 +453,18 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
               onChange={(event) => updateFilter("query", event.target.value)}
             />
           </label>
-          <div className="trace-filter-field">
+          <div className="trace-filter-field trace-filter-flag-field">
             <span className="trace-filter-label-row">
-              Flag contains
-              <Tooltip.Provider delayDuration={350} skipDelayDuration={120}>
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <button
-                      type="button"
-                      className="trace-inline-help"
-                      aria-label="Available flag filter values"
-                    >
-                      <CircleHelp size={12} aria-hidden="true" />
-                    </button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal container={tooltipContainer ?? undefined}>
-                    <Tooltip.Content
-                      className="trace-tooltip-content"
-                      side="top"
-                      align="center"
-                      sideOffset={6}
-                      collisionPadding={12}
-                    >
-                      <p className="trace-tooltip-title">Known flag filters (contains match)</p>
-                      <ul className="trace-tooltip-list">
-                        {FLAG_FILTER_PRESETS.filter((preset) => preset.value).map((preset) => (
-                          <li key={preset.value}>
-                            <code>{preset.value}</code>
-                            <span>{preset.description}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Tooltip.Arrow className="trace-tooltip-arrow" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              </Tooltip.Provider>
+              <span className="trace-filter-text">Flag contains</span>
+              <button
+                type="button"
+                className="trace-help-launch"
+                aria-label="Open flag filter help"
+                onClick={() => setIsFlagHelpOpen(true)}
+              >
+                <CircleHelp size={12} aria-hidden="true" />
+                Help ?
+              </button>
             </span>
             <select
               value={filters.flag}
@@ -599,6 +588,36 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
             {detailLoading ? <p>Loading trace...</p> : null}
             {!detailLoading && !detail ? <p>Trace details unavailable.</p> : null}
             {detail ? <TraceDetail detail={detail} /> : null}
+          </section>
+        </div>
+      ) : null}
+
+      {isFlagHelpOpen ? (
+        <div className="trace-help-overlay" onClick={() => setIsFlagHelpOpen(false)}>
+          <section
+            className="trace-help-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="trace-help-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="trace-help-head">
+              <h2 id="trace-help-title">Flag Filter Help</h2>
+              <p>Use any value below in the `Flag contains` filter. Matching uses contains semantics.</p>
+            </header>
+            <div className="trace-help-grid">
+              {FLAG_FILTER_PRESETS.filter((preset) => preset.value).map((preset) => (
+                <article key={preset.value} className="trace-help-row">
+                  <h4>{preset.label}</h4>
+                  <p>{preset.description}</p>
+                </article>
+              ))}
+            </div>
+            <div className="trace-help-actions">
+              <button type="button" className="trace-btn subtle" onClick={() => setIsFlagHelpOpen(false)}>
+                Close
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
