@@ -5,6 +5,7 @@ import { createLoggers } from "./logger";
 import { handleFetch } from "./routes/fetch";
 import { handleHealthz } from "./routes/healthz";
 import { handleSearch } from "./routes/search";
+import { handleWebFetch } from "./routes/web-fetch";
 import type { ServerContext } from "./server-context";
 import { BraveClient } from "./services/brave-client";
 import { ContentFetcher } from "./services/content-fetcher";
@@ -56,6 +57,12 @@ const server = Bun.serve({
         response = errorResponse(405, "Method not allowed");
       } else {
         response = await handleFetch(request, ctx);
+      }
+    } else if (pathname === "/v1/web-fetch") {
+      if (request.method !== "POST") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = await handleWebFetch(request, ctx);
       }
     } else {
       response = errorResponse(404, "Route not found");

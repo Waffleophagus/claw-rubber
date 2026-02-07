@@ -17,6 +17,7 @@ The proxy will:
 Endpoints:
 - `POST /v1/search`
 - `POST /v1/fetch`
+- `POST /v1/web-fetch`
 - `GET /healthz`
 
 Out of scope for v1:
@@ -66,6 +67,34 @@ Response (allow):
 
 Response (block):
 - `result_id: string`
+- `safety: { decision: "block"; score: number; flags: string[]; reason: string }`
+- HTTP `422` by default (fail-closed).
+
+### `POST /v1/web-fetch`
+Request:
+- `url: string` (required)
+- `extractMode?: "text" | "markdown"` (default `markdown`)
+- `maxChars?: number` (optional; unlimited when omitted)
+
+Behavior:
+- Fetches the requested page URL through the same safety pipeline used by `/v1/fetch`.
+- Supports direct URL retrieval for OpenClaw-style web-fetch flows.
+
+Response (allow):
+- `fetch_id: string`
+- `url: string`
+- `final_url: string`
+- `extract_mode: "text" | "markdown"`
+- `content: string`
+- `content_summary: string`
+- `truncated: boolean`
+- `safety: { decision: "allow"; score: number; flags: string[]; bypassed?: boolean }`
+
+Response (block):
+- `fetch_id: string`
+- `url: string`
+- `final_url?: string`
+- `extract_mode: "text" | "markdown"`
 - `safety: { decision: "block"; score: number; flags: string[]; reason: string }`
 - HTTP `422` by default (fail-closed).
 

@@ -5,6 +5,7 @@ A Bun-based secure proxy for OpenClaw web access via Brave Search.
 ## Features
 - Brave Web Search proxy (`/v1/search`)
 - Opaque result ID fetch flow (`/v1/fetch`)
+- OpenClaw-style direct URL fetch flow (`/v1/web-fetch`)
 - Domain allowlist + blocklist support
 - Prompt-injection rule scoring and fail-closed policy
 - Obfuscation-aware detection (typoglycemia, confusables, escape/encoding signals)
@@ -38,7 +39,25 @@ Server runs on `http://localhost:3000` by default.
 ## Endpoints
 - `POST /v1/search`
 - `POST /v1/fetch`
+- `POST /v1/web-fetch`
 - `GET /healthz`
+
+## Web Fetch Compatibility
+`/v1/web-fetch` is the OpenClaw-style direct fetch endpoint.
+
+Request:
+```json
+{
+  "url": "https://example.com",
+  "extractMode": "markdown",
+  "maxChars": 5000
+}
+```
+
+Notes:
+- `extractMode`: `markdown` (default) or `text`.
+- If `maxChars` is omitted, Claw-Rubber returns full extracted content.
+- Truncation happens only when `maxChars` is explicitly provided.
 
 ## URL Exposure
 Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to include URLs in `/v1/search` responses.
@@ -84,6 +103,13 @@ Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to inclu
 bun test
 ```
 
+Integration tests (not run by default):
+```bash
+bun run test:integration https://your-proxy-domain
+# optional bearer token as second argument:
+bun run test:integration https://your-proxy-domain YOUR_BEARER_TOKEN
+```
+
 ## Docker
 ```bash
 docker build -t claw-rubber .
@@ -116,3 +142,18 @@ Optional local Browserless debug port:
 - Browserless is exposed on `http://localhost:3001` by default (`BROWSERLESS_HOST_PORT` to override).
 - Override app image/tag with `CLAWRUBBER_IMAGE` in `.env` if needed.
 - If GHCR denies pulls, run: `docker login ghcr.io`.
+
+### Docker volume permissions troubleshooting
+If startup fails with `EACCES` on `/data/logs`, your existing named volume may be owned by root.
+
+One-time fix:
+```bash
+docker compose run --rm --user 0:0 claw-rubber sh -lc 'chown -R bun:bun /data'
+docker compose up -d
+```
+
+If that still fails, recreate the volume:
+```bash
+docker compose down -v
+docker compose up -d
+```
