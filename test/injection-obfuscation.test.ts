@@ -7,6 +7,7 @@ test("detects typoglycemia variants of risky keywords", () => {
 
   expect(result.flags.includes("typoglycemia_high_risk_keyword")).toBe(true);
   expect(result.score).toBeGreaterThanOrEqual(3);
+  expect((result.evidence ?? []).some((item) => item.detector === "typoglycemia")).toBe(true);
 });
 
 test("detects mixed-script confusable obfuscation", () => {
@@ -15,6 +16,7 @@ test("detects mixed-script confusable obfuscation", () => {
 
   expect(result.flags.includes("confusable_mixed_script")).toBe(true);
   expect(result.score).toBeGreaterThanOrEqual(8);
+  expect((result.evidence ?? []).some((item) => item.flag === "confusable_mixed_script")).toBe(true);
 });
 
 test("detects encoded payload with decode/execute context", () => {
@@ -24,6 +26,7 @@ test("detects encoded payload with decode/execute context", () => {
   expect(result.flags.includes("encoded_payload_candidate")).toBe(true);
   expect(result.flags.includes("decode_instruction_context")).toBe(true);
   expect(result.score).toBeGreaterThanOrEqual(4);
+  expect((result.evidence ?? []).some((item) => item.detector === "encoding")).toBe(true);
 });
 
 test("keeps benign encoding references below strict block threshold", () => {

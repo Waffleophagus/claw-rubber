@@ -1,4 +1,4 @@
-import type { InjectionScore } from "../types";
+import type { EvidenceBasis, EvidenceDetector, EvidenceMatch, InjectionScore } from "../types";
 import { detectEncodingObfuscationSignals } from "./encoding-signals";
 import { normalizeForSecurity } from "./obfuscation-normalizer";
 import { detectTypoglycemiaSignals } from "./typoglycemia";
@@ -71,17 +71,33 @@ const NORMALIZATION_SIGNAL_SCORES: Record<string, number> = {
   unicode_invisible_or_bidi: 2,
   confusable_mixed_script: 3,
 };
+const INVISIBLE_OR_BIDI_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g;
+const NON_ASCII_TOKEN_RE = /\S*[^\x00-\x7F]\S*/g;
 
 export function scorePromptInjection(content: string): InjectionScore {
   const normalized = normalizeForSecurity(content);
   const flags = new Set<string>();
+  const evidence: EvidenceMatch[] = [];
   let score = 0;
 
   for (const rule of RULES) {
     const targetText = rule.target === "raw" ? content : normalized.normalizedText;
-    if (rule.pattern.test(targetText)) {
+    const matches = collectRegexMatches(targetText, rule.pattern, 3);
+    if (matches.length > 0) {
       score += rule.weight;
       flags.add(rule.id);
+      for (const match of matches) {
+        evidence.push(buildEvidence({
+          flag: rule.id,
+          detector: "rule",
+          basis: rule.target,
+          start: match.start,
+          end: match.end,
+          matchedText: match.text,
+          contextText: targetText,
+          weight: rule.weight,
+        }));
+      }
     }
   }
 
@@ -92,6 +108,9 @@ export function scorePromptInjection(content: string): InjectionScore {
     }
 
     flags.add(signal);
+    evidence.push(
+      ...collectNormalizationEvidence(signal, content, normalized.normalizedText, signalWeight ?? 0),
+    );
   }
 
   const typoglycemia = detectTypoglycemiaSignals(normalized.normalizedText);
@@ -100,6 +119,19 @@ export function scorePromptInjection(content: string): InjectionScore {
     for (const flag of typoglycemia.flags) {
       flags.add(flag);
     }
+    for (const item of typoglycemia.evidence) {
+      evidence.push(buildEvidence({
+        flag: item.flag,
+        detector: "typoglycemia",
+        basis: "normalized",
+        start: item.start,
+        end: item.end,
+        matchedText: item.matchedText,
+        contextText: normalized.normalizedText,
+        weight: typoglycemia.score,
+        notes: item.notes,
+      }));
+    }
   }
 
   const encodingSignals = detectEncodingObfuscationSignals(content);
@@ -107,6 +139,19 @@ export function scorePromptInjection(content: string): InjectionScore {
     score += encodingSignals.score;
     for (const flag of encodingSignals.flags) {
       flags.add(flag);
+    }
+    for (const item of encodingSignals.evidence) {
+      evidence.push(buildEvidence({
+        flag: item.flag,
+        detector: "encoding",
+        basis: "raw",
+        start: item.start,
+        end: item.end,
+        matchedText: item.matchedText,
+        contextText: content,
+        weight: encodingSignals.score,
+        notes: item.notes,
+      }));
     }
   }
 
@@ -125,5 +170,155 @@ export function scorePromptInjection(content: string): InjectionScore {
     flags: allFlags,
     normalizationApplied: normalized.transformations,
     obfuscationSignals,
+    evidence: finalizeEvidence(evidence, 20),
   };
+}
+
+interface BuildEvidenceInput {
+  flag: string;
+  detector: EvidenceDetector;
+  basis: EvidenceBasis;
+  start: number | null;
+  end: number | null;
+  matchedText: string;
+  contextText: string;
+  weight: number;
+  notes?: string;
+}
+
+interface RegexMatch {
+  start: number;
+  end: number;
+  text: string;
+}
+
+function buildEvidence(input: BuildEvidenceInput): EvidenceMatch {
+  const excerpt = createExcerpt(input.contextText, input.start, input.end, input.matchedText);
+  return {
+    id: "",
+    flag: input.flag,
+    detector: input.detector,
+    basis: input.basis,
+    start: input.start,
+    end: input.end,
+    matchedText: input.matchedText,
+    excerpt,
+    weight: input.weight,
+    notes: input.notes,
+  };
+}
+
+function createExcerpt(source: string, start: number | null, end: number | null, fallback: string): string {
+  if (start === null || end === null || start < 0 || end <= start || end > source.length) {
+    return fallback.slice(0, 240);
+  }
+
+  const context = 50;
+  const left = Math.max(0, start - context);
+  const right = Math.min(source.length, end + context);
+  return source.slice(left, right);
+}
+
+function collectRegexMatches(text: string, pattern: RegExp, limit: number): RegexMatch[] {
+  const regex = pattern.flags.includes("g")
+    ? new RegExp(pattern.source, pattern.flags)
+    : new RegExp(pattern.source, `${pattern.flags}g`);
+
+  const matches: RegexMatch[] = [];
+  for (const match of text.matchAll(regex)) {
+    const value = match[0];
+    const start = match.index;
+    if (!value || start === undefined) {
+      continue;
+    }
+
+    matches.push({
+      start,
+      end: start + value.length,
+      text: value,
+    });
+
+    if (matches.length >= limit) {
+      break;
+    }
+  }
+
+  return matches;
+}
+
+function collectNormalizationEvidence(
+  signal: string,
+  rawText: string,
+  normalizedText: string,
+  weight: number,
+): EvidenceMatch[] {
+  if (signal === "unicode_invisible_or_bidi") {
+    const matches = collectRegexMatches(rawText, INVISIBLE_OR_BIDI_RE, 6);
+    return matches.map((match) => buildEvidence({
+      flag: signal,
+      detector: "normalization",
+      basis: "raw",
+      start: match.start,
+      end: match.end,
+      matchedText: match.text,
+      contextText: rawText,
+      weight,
+      notes: "Invisible or bidi control character",
+    }));
+  }
+
+  if (signal === "confusable_mixed_script") {
+    const rawMatches = collectRegexMatches(rawText, NON_ASCII_TOKEN_RE, 4);
+    if (rawMatches.length > 0) {
+      return rawMatches.map((match) => buildEvidence({
+        flag: signal,
+        detector: "normalization",
+        basis: "raw",
+        start: match.start,
+        end: match.end,
+        matchedText: match.text,
+        contextText: rawText,
+        weight,
+        notes: "Token contains mixed/confusable characters",
+      }));
+    }
+
+    return [
+      buildEvidence({
+        flag: signal,
+        detector: "normalization",
+        basis: "normalized",
+        start: null,
+        end: null,
+        matchedText: normalizedText.slice(0, 200),
+        contextText: normalizedText,
+        weight,
+        notes: "Detected during normalization",
+      }),
+    ];
+  }
+
+  return [];
+}
+
+function finalizeEvidence(evidence: EvidenceMatch[], maxItems: number): EvidenceMatch[] {
+  const seen = new Set<string>();
+  const deduped: EvidenceMatch[] = [];
+
+  for (const item of evidence) {
+    const key = `${item.flag}:${item.detector}:${item.basis}:${item.start ?? "n"}:${item.end ?? "n"}:${item.matchedText}`;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  deduped.sort((a, b) => b.weight - a.weight || a.flag.localeCompare(b.flag));
+
+  return deduped.slice(0, maxItems).map((item, index) => ({
+    ...item,
+    id: `${item.flag}-${item.detector}-${index}`,
+  }));
 }

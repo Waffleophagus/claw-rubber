@@ -41,6 +41,20 @@ interface DashboardEvent {
 
 interface DashboardEventDetail extends DashboardEvent {
   payloadContent: string | null;
+  evidence: EvidenceMatch[];
+}
+
+interface EvidenceMatch {
+  id: string;
+  flag: string;
+  detector: "rule" | "encoding" | "typoglycemia" | "normalization";
+  basis: "raw" | "normalized";
+  start: number | null;
+  end: number | null;
+  matchedText: string;
+  excerpt: string;
+  weight: number;
+  notes?: string;
 }
 
 interface OverviewPayload {
@@ -581,6 +595,28 @@ function App() {
                     : "n/a"}
                 />
                 <DetailRow label="Rule flags" value={selectedEvent.flags.join(", ") || "--"} mono />
+                {selectedEvent.evidence.length > 0 ? (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Why It Was Flagged</h3>
+                    {selectedEvent.evidence.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-amber-300/80 bg-amber-50 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="warning">{item.flag}</Badge>
+                          <Badge variant="secondary">{item.detector}</Badge>
+                          <Badge variant="secondary">{item.basis}</Badge>
+                          <span className="text-xs text-slate-600">weight {item.weight}</span>
+                        </div>
+                        <p className="mt-2 font-mono text-xs text-slate-800">{item.excerpt || item.matchedText || "--"}</p>
+                        {item.notes ? <p className="mt-1 text-xs text-slate-600">{item.notes}</p> : null}
+                        {item.basis === "normalized" ? (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Matched in normalized text; raw payload span may not be exact.
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {selectedEvent.decision === "block" ? (
                   <div className="pt-2">
                     <Button
@@ -595,7 +631,9 @@ function App() {
                 {selectedEvent.payloadContent ? (
                   <div>
                     <h3 className="mb-2 text-sm font-semibold text-slate-900">Stored Payload Content</h3>
-                    <pre className="code-block">{selectedEvent.payloadContent}</pre>
+                    <pre className="code-block">
+                      {renderHighlightedPayload(selectedEvent.payloadContent, selectedEvent.evidence)}
+                    </pre>
                   </div>
                 ) : (
                   <p className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -730,6 +768,67 @@ function extractErrorMessage(payload: unknown): string | null {
   }
 
   return null;
+}
+
+function renderHighlightedPayload(payload: string, evidence: EvidenceMatch[]): ReactNode {
+  const rawMatches = evidence
+    .filter((item) => item.basis === "raw" && item.start !== null && item.end !== null)
+    .map((item) => ({
+      start: item.start as number,
+      end: item.end as number,
+      flag: item.flag,
+    }))
+    .filter((item) => item.start >= 0 && item.end > item.start && item.end <= payload.length)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  if (rawMatches.length === 0) {
+    return payload;
+  }
+
+  const merged: Array<{ start: number; end: number; flags: Set<string> }> = [];
+  for (const match of rawMatches) {
+    const last = merged[merged.length - 1];
+    if (!last || match.start > last.end) {
+      merged.push({
+        start: match.start,
+        end: match.end,
+        flags: new Set([match.flag]),
+      });
+      continue;
+    }
+
+    last.end = Math.max(last.end, match.end);
+    last.flags.add(match.flag);
+  }
+
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  merged.forEach((range, index) => {
+    if (cursor < range.start) {
+      parts.push(
+        <span key={`plain-${index}-${cursor}`}>
+          {payload.slice(cursor, range.start)}
+        </span>,
+      );
+    }
+
+    parts.push(
+      <mark
+        key={`hit-${index}-${range.start}`}
+        className="payload-highlight"
+        title={[...range.flags].join(", ")}
+      >
+        {payload.slice(range.start, range.end)}
+      </mark>,
+    );
+    cursor = range.end;
+  });
+
+  if (cursor < payload.length) {
+    parts.push(<span key={`plain-end-${cursor}`}>{payload.slice(cursor)}</span>);
+  }
+
+  return <>{parts}</>;
 }
 
 const container = document.getElementById("root");

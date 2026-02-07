@@ -1,4 +1,19 @@
 export type Availability = "allowed" | "blocked";
+export type EvidenceDetector = "rule" | "encoding" | "typoglycemia" | "normalization";
+export type EvidenceBasis = "raw" | "normalized";
+
+export interface EvidenceMatch {
+  id: string;
+  flag: string;
+  detector: EvidenceDetector;
+  basis: EvidenceBasis;
+  start: number | null;
+  end: number | null;
+  matchedText: string;
+  excerpt: string;
+  weight: number;
+  notes?: string;
+}
 
 export interface SearchResultRecord {
   resultId: string;
@@ -31,6 +46,7 @@ export interface InjectionScore {
   flags: string[];
   normalizationApplied?: string[];
   obfuscationSignals?: string[];
+  evidence?: EvidenceMatch[];
 }
 
 export interface JudgeResult {

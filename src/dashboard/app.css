@@ -57,3 +57,10 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.payload-highlight {
+  background: #fde68a;
+  color: #1f2937;
+  border-radius: 0.2rem;
+  padding: 0 0.05rem;
+}

@@ -1,6 +1,15 @@
 export interface SignalScore {
   score: number;
   flags: string[];
+  evidence: SignalEvidence[];
+}
+
+export interface SignalEvidence {
+  flag: string;
+  start: number;
+  end: number;
+  matchedText: string;
+  notes?: string;
 }
 
 const HIGH_RISK_KEYWORDS = [
@@ -27,25 +36,35 @@ const HIGH_RISK_KEYWORDS = [
 export function detectTypoglycemiaSignals(content: string): SignalScore {
   const tokens = tokenize(content);
   const matches = new Set<string>();
+  const evidence: SignalEvidence[] = [];
 
   for (const token of tokens) {
-    if (token.length < 5 || token.length > 20) {
+    if (token.text.length < 5 || token.text.length > 20) {
       continue;
     }
 
     for (const keyword of HIGH_RISK_KEYWORDS) {
-      if (token === keyword || token.length !== keyword.length) {
+      if (token.text === keyword || token.text.length !== keyword.length) {
         continue;
       }
 
-      if (isLikelyTypoglycemiaVariant(token, keyword)) {
+      if (isLikelyTypoglycemiaVariant(token.text, keyword)) {
         matches.add(keyword);
+        if (evidence.length < 6) {
+          evidence.push({
+            flag: `typoglycemia_keyword:${keyword}`,
+            start: token.start,
+            end: token.start + token.text.length,
+            matchedText: token.text,
+            notes: `Variant of '${keyword}'`,
+          });
+        }
       }
     }
   }
 
   if (matches.size === 0) {
-    return { score: 0, flags: [] };
+    return { score: 0, flags: [], evidence: [] };
   }
 
   const score = Math.min(3 + Math.max(matches.size - 1, 0), 7);
@@ -55,12 +74,24 @@ export function detectTypoglycemiaSignals(content: string): SignalScore {
       "typoglycemia_high_risk_keyword",
       ...[...matches].map((keyword) => `typoglycemia_keyword:${keyword}`),
     ],
+    evidence,
   };
 }
 
-function tokenize(content: string): string[] {
-  const matches = content.match(/[a-z]{3,}/g);
-  return matches ?? [];
+function tokenize(content: string): Array<{ text: string; start: number }> {
+  const tokens: Array<{ text: string; start: number }> = [];
+  const regex = /[a-z]{3,}/g;
+  for (const match of content.matchAll(regex)) {
+    const text = match[0];
+    const start = match.index;
+    if (!text || start === undefined) {
+      continue;
+    }
+
+    tokens.push({ text, start });
+  }
+
+  return tokens;
 }
 
 function isLikelyTypoglycemiaVariant(token: string, keyword: string): boolean {

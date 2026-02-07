@@ -1,4 +1,5 @@
 import { evaluateDomainPolicy } from "../lib/domain-policy";
+import type { EvidenceMatch } from "../types";
 import type { ServerContext } from "../server-context";
 import { scorePromptInjection } from "./injection-rules";
 import { decidePolicy } from "./policy";
@@ -118,6 +119,7 @@ export async function processFetchedPage(
   let flags: string[] = [];
   let normalizationApplied: string[] = [];
   let obfuscationSignals: string[] = [];
+  let evidence: EvidenceMatch[] = [];
 
   if (domainPolicy.action === "inspect") {
     const scored = scorePromptInjection(scoringText);
@@ -125,6 +127,7 @@ export async function processFetchedPage(
     flags = scored.flags;
     normalizationApplied = scored.normalizationApplied ?? [];
     obfuscationSignals = scored.obfuscationSignals ?? [];
+    evidence = scored.evidence ?? [];
   }
 
   const shouldUseJudge =
@@ -170,6 +173,7 @@ export async function processFetchedPage(
       flags: decision.flags,
       reason: decision.reason ?? "Blocked by policy",
       content: scoringText.slice(0, 30_000),
+      evidence,
     });
 
     ctx.loggers.security.warn(

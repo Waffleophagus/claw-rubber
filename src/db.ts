@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import { normalizeDomain } from "./lib/domain-policy";
-import type { SearchResultRecord } from "./types";
+import type { EvidenceMatch, SearchResultRecord } from "./types";
 
 export interface FetchEventInput {
   resultId: string;
@@ -29,6 +29,7 @@ export interface FlaggedPayloadInput {
   flags: string[];
   reason: string;
   content: string;
+  evidence?: EvidenceMatch[];
 }
 
 export interface SearchBlockEventInput {
@@ -79,6 +80,7 @@ export interface DashboardEventRecord {
 
 export interface DashboardEventDetail extends DashboardEventRecord {
   payloadContent: string | null;
+  evidence: EvidenceMatch[];
 }
 
 export interface DashboardOverview {
@@ -175,6 +177,7 @@ export class AppDb {
         domain TEXT NOT NULL,
         score INTEGER NOT NULL,
         flags_json TEXT NOT NULL,
+        evidence_json TEXT,
         reason TEXT NOT NULL,
         content TEXT NOT NULL,
         created_at INTEGER NOT NULL
@@ -215,6 +218,7 @@ export class AppDb {
     this.ensureColumn("fetch_events", "medium_threshold", "INTEGER");
     this.ensureColumn("fetch_events", "block_threshold", "INTEGER");
     this.ensureColumn("flagged_payloads", "fetch_event_id", "INTEGER");
+    this.ensureColumn("flagged_payloads", "evidence_json", "TEXT");
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id)`);
   }
 
@@ -347,8 +351,8 @@ export class AppDb {
     const stmt = this.db.prepare(
       `
         INSERT INTO flagged_payloads (
-          fetch_event_id, result_id, url, domain, score, flags_json, reason, content, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          fetch_event_id, result_id, url, domain, score, flags_json, evidence_json, reason, content, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     );
 
@@ -359,6 +363,7 @@ export class AppDb {
       payload.domain,
       payload.score,
       JSON.stringify(payload.flags),
+      JSON.stringify(payload.evidence ?? []),
       payload.reason,
       payload.content,
       Date.now(),
@@ -634,13 +639,14 @@ export class AppDb {
         .prepare(
           `
             SELECT content
+                 , evidence_json
             FROM flagged_payloads
             WHERE fetch_event_id = ?
             ORDER BY created_at DESC
             LIMIT 1
           `,
         )
-        .get(fetchRow.id) as { content: string } | undefined;
+        .get(fetchRow.id) as { content: string; evidence_json: string | null } | undefined;
 
       const fallbackPayload = payload
         ? null
@@ -648,13 +654,14 @@ export class AppDb {
             .prepare(
               `
                 SELECT content
+                     , evidence_json
                 FROM flagged_payloads
                 WHERE result_id = ?
                 ORDER BY created_at DESC
                 LIMIT 1
               `,
             )
-            .get(fetchRow.result_id) as { content: string } | undefined);
+            .get(fetchRow.result_id) as { content: string; evidence_json: string | null } | undefined);
 
       return {
         eventId: `fetch:${fetchRow.id}`,
@@ -676,6 +683,7 @@ export class AppDb {
         query: null,
         requestId: null,
         payloadContent: payload?.content ?? fallbackPayload?.content ?? null,
+        evidence: parseEvidence(payload?.evidence_json ?? fallbackPayload?.evidence_json ?? null),
       };
     }
 
@@ -735,6 +743,7 @@ export class AppDb {
         query: searchRow.query,
         requestId: searchRow.request_id,
         payloadContent: null,
+        evidence: [],
       };
     }
 
@@ -954,6 +963,48 @@ function parseFlags(input: string): string[] {
   } catch {
     return [];
   }
+}
+
+function parseEvidence(input: string | null): EvidenceMatch[] {
+  if (!input) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(input) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map((item, index) => {
+        const start = typeof item.start === "number" ? item.start : null;
+        const end = typeof item.end === "number" ? item.end : null;
+        return {
+          id: typeof item.id === "string" ? item.id : `evidence-${index}`,
+          flag: typeof item.flag === "string" ? item.flag : "unknown",
+          detector: toDetector(item.detector),
+          basis: item.basis === "raw" || item.basis === "normalized" ? item.basis : "normalized",
+          start,
+          end,
+          matchedText: typeof item.matchedText === "string" ? item.matchedText : "",
+          excerpt: typeof item.excerpt === "string" ? item.excerpt : "",
+          weight: typeof item.weight === "number" ? item.weight : 0,
+          notes: typeof item.notes === "string" ? item.notes : undefined,
+        } satisfies EvidenceMatch;
+      });
+  } catch {
+    return [];
+  }
+}
+
+function toDetector(value: unknown): EvidenceMatch["detector"] {
+  if (value === "rule" || value === "encoding" || value === "typoglycemia" || value === "normalization") {
+    return value;
+  }
+
+  return "rule";
 }
 
 function isValidDomainEntry(domain: string): boolean {
