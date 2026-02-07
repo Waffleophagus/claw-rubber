@@ -7,6 +7,7 @@ A Bun-based secure proxy for OpenClaw web access via Brave Search.
 - Opaque result ID fetch flow (`/v1/fetch`)
 - Domain allowlist + blocklist support
 - Prompt-injection rule scoring and fail-closed policy
+- Obfuscation-aware detection (typoglycemia, confusables, escape/encoding signals)
 - Optional model adjudication via Vercel AI SDK (OpenAI/Ollama)
 - Optional Browserless-rendered fetches for JavaScript-heavy pages
 - SQLite audit storage for flagged payloads
@@ -54,7 +55,6 @@ Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to inclu
 - Run Browserless in an isolated network context; treat it as a high-privilege fetcher.
 
 ## Environment Variables
-- `CLAWRUBBER_BRAVE_API_KEY`
 - `CLAWRUBBER_BRAVE_API_KEY`
 - `CLAWRUBBER_PROFILE=baseline|strict|paranoid`
 - `CLAWRUBBER_REDACT_URLS=true|false`

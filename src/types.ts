@@ -29,6 +29,8 @@ export interface SearchResultResponse {
 export interface InjectionScore {
   score: number;
   flags: string[];
+  normalizationApplied?: string[];
+  obfuscationSignals?: string[];
 }
 
 export interface JudgeResult {

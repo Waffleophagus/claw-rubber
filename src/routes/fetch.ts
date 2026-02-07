@@ -80,11 +80,15 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
 
     let score = 0;
     let flags: string[] = [];
+    let normalizationApplied: string[] = [];
+    let obfuscationSignals: string[] = [];
 
     if (domainPolicy.action === "inspect") {
       const scored = scorePromptInjection(cleanText);
       score = scored.score;
       flags = scored.flags;
+      normalizationApplied = scored.normalizationApplied ?? [];
+      obfuscationSignals = scored.obfuscationSignals ?? [];
     }
 
     const shouldUseJudge =
@@ -151,6 +155,8 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
             score: decision.score,
             flags: decision.flags,
             reason: decision.reason ?? "Blocked by policy",
+            normalization_applied: normalizationApplied,
+            obfuscation_signals: obfuscationSignals,
           },
         },
         422,
@@ -166,6 +172,8 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
         score: decision.score,
         flags: decision.flags,
         bypassed: decision.bypassed ?? false,
+        normalization_applied: normalizationApplied,
+        obfuscation_signals: obfuscationSignals,
       },
       source: {
         domain: record.domain,
