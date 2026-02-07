@@ -6,7 +6,9 @@ A Bun-based secure proxy for OpenClaw web access via Brave Search.
 - Brave Web Search proxy (`/v1/search`)
 - Opaque result ID fetch flow (`/v1/fetch`)
 - OpenClaw-style direct URL fetch flow (`/v1/web-fetch`)
+- Human investigator dashboard (`/dashboard`)
 - Domain allowlist + blocklist support
+- Runtime allowlist updates from dashboard/API
 - Prompt-injection rule scoring and fail-closed policy
 - Obfuscation-aware detection (typoglycemia, confusables, escape/encoding signals)
 - Optional model adjudication via Vercel AI SDK (OpenAI/Ollama)
@@ -41,6 +43,33 @@ Server runs on `http://localhost:3000` by default.
 - `POST /v1/fetch`
 - `POST /v1/web-fetch`
 - `GET /healthz`
+- `GET /dashboard`
+- `GET /v1/dashboard/overview`
+- `GET /v1/dashboard/events`
+- `GET /v1/dashboard/events/:id`
+- `GET /v1/dashboard/timeseries`
+- `GET /v1/dashboard/top-domains`
+- `GET /v1/dashboard/top-flags`
+- `GET /v1/dashboard/top-reasons`
+- `GET /v1/dashboard/allowlist`
+- `POST /v1/dashboard/allowlist`
+
+## Investigator Dashboard
+The dashboard is designed for human false-positive investigation and policy tuning:
+- See why requests were blocked (reason, `blockedBy`, flags, score, thresholds)
+- Review blocked fetch events and search domain blocks
+- Open event details including stored flagged payload content
+- Add domains to runtime allowlist without restarting the service
+
+Open:
+```bash
+http://localhost:3000/dashboard
+```
+
+Runtime allowlist behavior:
+- Added domains are persisted in SQLite and applied immediately.
+- Blocklist still has highest precedence (blocklist always wins).
+- Environment allowlist (`CLAWRUBBER_ALLOWLIST_DOMAINS`) remains active and is merged with runtime entries.
 
 ## Web Fetch Compatibility
 `/v1/web-fetch` is the OpenClaw-style direct fetch endpoint.

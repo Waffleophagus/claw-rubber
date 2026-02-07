@@ -12,6 +12,8 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
     "@types/turndown": "^5.0.6"
   },
   "peerDependencies": {
@@ -20,9 +22,18 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.25",
     "ai": "^6.0.73",
+    "bun-plugin-tailwind": "^0.1.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
     "ollama-ai-provider": "^1.2.0",
     "pino": "^10.3.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "recharts": "^3.7.0",
     "rotating-file-stream": "^3.2.8",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.18",
     "turndown": "^7.2.2",
     "zod": "^4.3.6"
   }

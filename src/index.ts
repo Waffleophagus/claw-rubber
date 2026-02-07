@@ -2,6 +2,17 @@ import { loadConfig } from "./config";
 import { AppDb } from "./db";
 import { errorResponse } from "./lib/http";
 import { createLoggers } from "./logger";
+import {
+  handleDashboardAllowlistGet,
+  handleDashboardAllowlistPost,
+  handleDashboardEventDetail,
+  handleDashboardEvents,
+  handleDashboardOverview,
+  handleDashboardTimeseries,
+  handleDashboardTopDomains,
+  handleDashboardTopFlags,
+  handleDashboardTopReasons,
+} from "./routes/dashboard";
 import { handleFetch } from "./routes/fetch";
 import { handleHealthz } from "./routes/healthz";
 import { handleSearch } from "./routes/search";
@@ -10,6 +21,7 @@ import type { ServerContext } from "./server-context";
 import { BraveClient } from "./services/brave-client";
 import { ContentFetcher } from "./services/content-fetcher";
 import { LlmJudge } from "./services/llm-judge";
+import dashboard from "./dashboard/index.html";
 
 const config = loadConfig();
 const loggers = createLoggers(config);
@@ -36,6 +48,10 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 const server = Bun.serve({
+  routes: {
+    "/dashboard": dashboard,
+    "/dashboard/": dashboard,
+  },
   hostname: config.host,
   port: config.port,
   fetch: async (request) => {
@@ -63,6 +79,56 @@ const server = Bun.serve({
         response = errorResponse(405, "Method not allowed");
       } else {
         response = await handleWebFetch(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/overview") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardOverview(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/events") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardEvents(request, ctx);
+      }
+    } else if (pathname.startsWith("/v1/dashboard/events/")) {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardEventDetail(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/timeseries") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardTimeseries(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/top-domains") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardTopDomains(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/top-flags") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardTopFlags(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/top-reasons") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardTopReasons(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/allowlist") {
+      if (request.method === "GET") {
+        response = await handleDashboardAllowlistGet(request, ctx);
+      } else if (request.method === "POST") {
+        response = await handleDashboardAllowlistPost(request, ctx);
+      } else {
+        response = errorResponse(405, "Method not allowed");
       }
     } else {
       response = errorResponse(404, "Route not found");

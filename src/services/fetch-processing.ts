@@ -57,15 +57,21 @@ export async function processFetchedPage(
   ctx: ServerContext,
   input: FetchProcessingInput,
 ): Promise<ProcessedFetch> {
-  const domainPolicy = evaluateDomainPolicy(input.domain, ctx.config.allowlistDomains, ctx.config.blocklistDomains);
+  const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains);
+  const domainPolicy = evaluateDomainPolicy(input.domain, effectiveAllowlist, ctx.config.blocklistDomains);
   if (domainPolicy.action === "block") {
     ctx.db.storeFetchEvent({
       resultId: input.eventId,
+      url: input.url,
       domain: input.domain,
       decision: "block",
       score: 0,
       flags: ["domain_blocklist"],
       reason: domainPolicy.reason ?? "Domain blocked",
+      blockedBy: "domain-policy",
+      domainAction: domainPolicy.action,
+      mediumThreshold: ctx.config.profileSettings.mediumThreshold,
+      blockThreshold: ctx.config.profileSettings.blockThreshold,
       bypassed: false,
       durationMs: Date.now() - input.startedAt,
     });
@@ -138,19 +144,25 @@ export async function processFetchedPage(
     judge,
   );
 
-  ctx.db.storeFetchEvent({
+  const fetchEventId = ctx.db.storeFetchEvent({
     resultId: input.eventId,
+    url: input.url,
     domain: input.domain,
     decision: decision.decision,
     score: decision.score,
     flags: decision.flags,
     reason: decision.reason ?? null,
+    blockedBy: classifyBlockedBy(decision.decision, decision.reason, decision.flags, domainPolicy.action),
+    domainAction: domainPolicy.action,
+    mediumThreshold: ctx.config.profileSettings.mediumThreshold,
+    blockThreshold: ctx.config.profileSettings.blockThreshold,
     bypassed: decision.bypassed ?? false,
     durationMs: Date.now() - input.startedAt,
   });
 
   if (decision.decision === "block") {
     ctx.db.storeFlaggedPayload({
+      fetchEventId,
       resultId: input.eventId,
       url: input.url,
       domain: input.domain,
@@ -214,4 +226,34 @@ export async function processFetchedPage(
       content_type: fetched.contentType,
     },
   };
+}
+
+function classifyBlockedBy(
+  decision: "allow" | "block",
+  reason: string | undefined,
+  flags: string[],
+  domainAction: "allow-bypass" | "block" | "inspect",
+): string | null {
+  if (decision !== "block") {
+    return null;
+  }
+
+  if (domainAction === "block" || flags.includes("domain_blocklist")) {
+    return "domain-policy";
+  }
+
+  const normalizedReason = (reason ?? "").toLowerCase();
+  if (normalizedReason.startsWith("fail-closed:")) {
+    return "fail-closed";
+  }
+
+  if (normalizedReason.startsWith("rule score")) {
+    return "rule-threshold";
+  }
+
+  if (flags.some((flag) => flag.startsWith("llm_judge:")) || normalizedReason.includes("llm judge")) {
+    return "llm-judge";
+  }
+
+  return "policy";
 }

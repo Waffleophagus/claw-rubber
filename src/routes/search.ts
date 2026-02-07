@@ -26,6 +26,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
   const requestId = crypto.randomUUID();
 
   try {
+    const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains);
     const brave = await ctx.braveClient.webSearch({
       query: body.query,
       count: body.count,
@@ -41,7 +42,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
     const records: SearchResultRecord[] = brave.results.map((item) => {
       const resultId = crypto.randomUUID();
       const domain = safeDomain(item.url);
-      const domainPolicy = evaluateDomainPolicy(domain, ctx.config.allowlistDomains, ctx.config.blocklistDomains);
+      const domainPolicy = evaluateDomainPolicy(domain, effectiveAllowlist, ctx.config.blocklistDomains);
 
       return {
         resultId,
@@ -61,6 +62,19 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
 
     for (const record of records) {
       ctx.db.storeSearchResult(record);
+
+      if (record.availability === "blocked") {
+        ctx.db.storeSearchBlockEvent({
+          requestId,
+          resultId: record.resultId,
+          query: record.query,
+          url: record.url,
+          domain: record.domain,
+          title: record.title,
+          source: record.source,
+          reason: record.blockReason ?? "Domain blocklisted",
+        });
+      }
     }
 
     const results: SearchResultResponse[] = records.map((record) => {
