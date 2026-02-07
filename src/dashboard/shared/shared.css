@@ -972,7 +972,99 @@ body {
     width: 100%;
   }
 
+  .trace-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trace-filter-label-row {
+    white-space: normal;
+  }
+
+  .trace-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .trace-table-wrap {
-    max-height: 55vh;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .trace-table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .trace-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .trace-table tbody,
+  .trace-table tr,
+  .trace-table td {
+    display: block;
+  }
+
+  .trace-table tbody tr {
+    border: 1px solid color-mix(in srgb, var(--trace-border, #cbd5e1) 70%, transparent);
+    border-radius: 0.85rem;
+    margin-bottom: 0.62rem;
+    padding: 0.25rem 0.62rem 0.4rem;
+    background: color-mix(in srgb, var(--trace-panel-strong, #fff) 90%, transparent);
+  }
+
+  .trace-table tbody tr:hover {
+    background: color-mix(in srgb, var(--trace-panel-strong, #fff) 90%, transparent);
+  }
+
+  .trace-table tbody tr.selected {
+    border-color: color-mix(in srgb, var(--trace-accent, #0f766e) 42%, var(--trace-border, #cbd5e1));
+    background: color-mix(in srgb, var(--trace-accent, #0f766e) 10%, var(--trace-panel-strong, #fff));
+  }
+
+  .trace-table td {
+    border: 0;
+    border-bottom: 1px dashed color-mix(in srgb, var(--trace-border, #cbd5e1) 64%, transparent);
+    padding: 0.38rem 0;
+    display: grid;
+    grid-template-columns: minmax(6.8rem, 42%) 1fr;
+    gap: 0.55rem;
+    align-items: start;
+  }
+
+  .trace-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .trace-table td::before {
+    content: attr(data-label);
+    color: var(--trace-muted, #475569);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    line-height: 1.35;
+  }
+
+  .trace-table td .trace-pill {
+    justify-self: start;
+  }
+
+  .trace-table td.trace-cell-text {
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .trace-pagination {
+    justify-content: stretch;
+  }
+
+  .trace-pagination .trace-btn {
+    flex: 1;
   }
 }

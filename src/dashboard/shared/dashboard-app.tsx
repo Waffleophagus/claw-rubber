@@ -757,15 +757,15 @@ function TraceStream({
               className={selectedId === event.eventId ? "selected" : ""}
               onClick={() => onSelect(event.eventId)}
             >
-              <td>{formatDate(event.createdAt)}</td>
-              <td className="strong">{event.domain}</td>
-              <td><StatusPill event={event} /></td>
-              <td>{humanTraceKind(event.traceKind)}</td>
-              <td>{formatRank(event)}</td>
-              <td>{formatScore(event)}</td>
-              <td>{humanAllowedBy(event.allowedBy)}</td>
-              <td>{event.query ?? "--"}</td>
-              <td>{event.reason ?? "--"}</td>
+              <td data-label="Time">{formatDate(event.createdAt)}</td>
+              <td className="strong" data-label="Domain">{event.domain}</td>
+              <td data-label="Decision"><StatusPill event={event} /></td>
+              <td data-label="Trace">{humanTraceKind(event.traceKind)}</td>
+              <td data-label="Rank">{formatRank(event)}</td>
+              <td data-label="Score">{formatScore(event)}</td>
+              <td data-label="Allowed by">{humanAllowedBy(event.allowedBy)}</td>
+              <td data-label="Query" className="trace-cell-text">{event.query ?? "--"}</td>
+              <td data-label="Reason" className="trace-cell-text">{event.reason ?? "--"}</td>
             </tr>
           ))}
         </tbody>
