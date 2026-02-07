@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Database } from "bun:sqlite";
 import { AppDb } from "../src/db";
 
 function createDbPath(): string {
@@ -25,6 +26,90 @@ function cleanupDb(path: string): void {
 }
 
 describe("dashboard db", () => {
+  test("migrates legacy flagged_payloads schema before creating fetch_event_id index", () => {
+    const path = createDbPath();
+    let legacyDb: Database | null = null;
+
+    try {
+      legacyDb = new Database(path, { create: true, strict: true });
+      legacyDb.exec(`
+        CREATE TABLE fetch_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          result_id TEXT NOT NULL,
+          domain TEXT NOT NULL,
+          decision TEXT NOT NULL,
+          score INTEGER NOT NULL,
+          flags_json TEXT NOT NULL,
+          reason TEXT,
+          bypassed INTEGER NOT NULL,
+          duration_ms INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE flagged_payloads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          result_id TEXT NOT NULL,
+          url TEXT NOT NULL,
+          domain TEXT NOT NULL,
+          score INTEGER NOT NULL,
+          flags_json TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX idx_flagged_payloads_result_id ON flagged_payloads(result_id);
+      `);
+      legacyDb.close();
+      legacyDb = null;
+
+      // Should not throw on migration from older schema.
+      const db = new AppDb(path);
+
+      const verifyDb = new Database(path, { strict: true });
+      const columns = verifyDb.prepare(`PRAGMA table_info(flagged_payloads)`).all() as Array<{ name: string }>;
+      const indexRows = verifyDb.prepare(`PRAGMA index_list(flagged_payloads)`).all() as Array<{ name: string }>;
+
+      expect(columns.some((column) => column.name === "fetch_event_id")).toBe(true);
+      expect(indexRows.some((index) => index.name === "idx_flagged_payloads_fetch_event_id")).toBe(true);
+
+      const eventId = db.storeFetchEvent({
+        resultId: "legacy-result",
+        url: "https://legacy.example",
+        domain: "legacy.example",
+        decision: "block",
+        score: 11,
+        flags: ["legacy_rule"],
+        reason: "legacy migration test",
+        blockedBy: "policy",
+        domainAction: "inspect",
+        mediumThreshold: 6,
+        blockThreshold: 10,
+        bypassed: false,
+        durationMs: 30,
+      });
+
+      db.storeFlaggedPayload({
+        fetchEventId: eventId,
+        resultId: "legacy-result",
+        url: "https://legacy.example",
+        domain: "legacy.example",
+        score: 11,
+        flags: ["legacy_rule"],
+        reason: "legacy migration test",
+        content: "legacy payload",
+      });
+
+      const detail = db.getDashboardEventDetail(`fetch:${eventId}`);
+      expect(detail?.payloadContent).toContain("legacy payload");
+
+      verifyDb.close();
+    } finally {
+      legacyDb?.close();
+      cleanupDb(path);
+    }
+  });
+
   test("runtime allowlist merges with static allowlist", () => {
     const { db, path } = createDb();
     try {

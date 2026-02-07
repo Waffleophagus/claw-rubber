@@ -204,7 +204,6 @@ export class AppDb {
       CREATE INDEX IF NOT EXISTS idx_fetch_events_result_id ON fetch_events(result_id);
       CREATE INDEX IF NOT EXISTS idx_flagged_payloads_created_at ON flagged_payloads(created_at);
       CREATE INDEX IF NOT EXISTS idx_flagged_payloads_result_id ON flagged_payloads(result_id);
-      CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id);
       CREATE INDEX IF NOT EXISTS idx_search_block_events_created_at ON search_block_events(created_at);
       CREATE INDEX IF NOT EXISTS idx_search_block_events_domain ON search_block_events(domain);
       CREATE INDEX IF NOT EXISTS idx_search_block_events_result_id ON search_block_events(result_id);
@@ -216,6 +215,7 @@ export class AppDb {
     this.ensureColumn("fetch_events", "medium_threshold", "INTEGER");
     this.ensureColumn("fetch_events", "block_threshold", "INTEGER");
     this.ensureColumn("flagged_payloads", "fetch_event_id", "INTEGER");
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id)`);
   }
 
   storeSearchRequest(requestId: string, query: string, responseJson: unknown): void {
