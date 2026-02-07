@@ -1,5 +1,5 @@
-import type { AppConfig } from "../config";
-import type { JudgeResult, PolicyDecision } from "../types.ts";
+import type { AppConfig } from "../config"
+import type { JudgeResult, PolicyDecision } from "../types.ts"
 
 export function decidePolicy(
   config: AppConfig,
@@ -16,7 +16,7 @@ export function decidePolicy(
       flags: [...initialFlags, "domain_blocklist"],
       reason: domainReason ?? "Domain is blocklisted",
       bypassed: false,
-    };
+    }
   }
 
   if (domainAction === "allow-bypass") {
@@ -26,14 +26,14 @@ export function decidePolicy(
       flags: ["domain_allowlist_bypass"],
       reason: domainReason,
       bypassed: true,
-    };
+    }
   }
 
-  const score = initialScore;
-  const flags = [...initialFlags];
+  const score = initialScore
+  const flags = [...initialFlags]
 
   if (judgeResult) {
-    flags.push(`llm_judge:${judgeResult.label}`);
+    flags.push(`llm_judge:${judgeResult.label}`)
 
     if (judgeResult.label === "malicious") {
       return {
@@ -42,7 +42,7 @@ export function decidePolicy(
         flags,
         reason: `LLM judge labeled malicious (${judgeResult.confidence.toFixed(2)})`,
         bypassed: false,
-      };
+      }
     }
 
     if (judgeResult.label === "suspicious" && judgeResult.confidence >= 0.75) {
@@ -52,7 +52,7 @@ export function decidePolicy(
         flags,
         reason: `LLM judge labeled suspicious with confidence ${judgeResult.confidence.toFixed(2)}`,
         bypassed: false,
-      };
+      }
     }
   }
 
@@ -63,7 +63,7 @@ export function decidePolicy(
       flags,
       reason: `Rule score ${score} >= block threshold ${config.profileSettings.blockThreshold}`,
       bypassed: false,
-    };
+    }
   }
 
   if (config.failClosed && score >= config.profileSettings.mediumThreshold) {
@@ -73,7 +73,7 @@ export function decidePolicy(
       flags,
       reason: `Fail-closed: rule score ${score} >= medium threshold ${config.profileSettings.mediumThreshold}`,
       bypassed: false,
-    };
+    }
   }
 
   return {
@@ -81,5 +81,5 @@ export function decidePolicy(
     score,
     flags,
     bypassed: false,
-  };
+  }
 }

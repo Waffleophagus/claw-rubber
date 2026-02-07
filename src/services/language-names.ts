@@ -128,4 +128,4 @@ export const SEEDED_LANGUAGE_NAMES = [
   "العربية",
   "বাংলা",
   "हिन्दी",
-].map((item) => item.normalize("NFKC").toLowerCase());
+].map((item) => item.normalize("NFKC").toLowerCase())

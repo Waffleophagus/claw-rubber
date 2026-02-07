@@ -1,67 +1,67 @@
-export type Availability = "allowed" | "blocked";
-export type EvidenceDetector = "rule" | "encoding" | "typoglycemia" | "normalization";
-export type EvidenceBasis = "raw" | "normalized";
+export type Availability = "allowed" | "blocked"
+export type EvidenceDetector = "rule" | "encoding" | "typoglycemia" | "normalization"
+export type EvidenceBasis = "raw" | "normalized"
 
 export interface EvidenceMatch {
-  id: string;
-  flag: string;
-  detector: EvidenceDetector;
-  basis: EvidenceBasis;
-  start: number | null;
-  end: number | null;
-  matchedText: string;
-  excerpt: string;
-  weight: number;
-  notes?: string;
+  id: string
+  flag: string
+  detector: EvidenceDetector
+  basis: EvidenceBasis
+  start: number | null
+  end: number | null
+  matchedText: string
+  excerpt: string
+  weight: number
+  notes?: string
 }
 
 export interface SearchResultRecord {
-  resultId: string;
-  requestId: string;
-  query: string;
-  rank?: number | null;
-  url: string;
-  domain: string;
-  title: string;
-  snippet: string;
-  source: string;
-  availability: Availability;
-  blockReason: string | null;
-  createdAt: number;
-  expiresAt: number;
+  resultId: string
+  requestId: string
+  query: string
+  rank?: number | null
+  url: string
+  domain: string
+  title: string
+  snippet: string
+  source: string
+  availability: Availability
+  blockReason: string | null
+  createdAt: number
+  expiresAt: number
 }
 
 export interface SearchResultResponse {
-  result_id: string;
-  title: string;
-  snippet: string;
-  source: string;
-  rank?: number;
-  published?: string;
-  availability: Availability;
-  risk_hint?: "low" | "medium" | "high";
-  url?: string;
+  result_id: string
+  title: string
+  snippet: string
+  source: string
+  rank?: number
+  published?: string
+  availability: Availability
+  risk_hint?: "low" | "medium" | "high"
+  url?: string
 }
 
 export interface InjectionScore {
-  score: number;
-  flags: string[];
-  allowSignals?: string[];
-  normalizationApplied?: string[];
-  obfuscationSignals?: string[];
-  evidence?: EvidenceMatch[];
+  score: number
+  flags: string[]
+  allowSignals?: string[]
+  normalizationApplied?: string[]
+  obfuscationSignals?: string[]
+  evidence?: EvidenceMatch[]
 }
 
 export interface JudgeResult {
-  label: "benign" | "suspicious" | "malicious";
-  confidence: number;
-  reasons: string[];
+  label: "benign" | "suspicious" | "malicious"
+  confidence: number
+  reasons: string[]
 }
 
 export interface PolicyDecision {
-  decision: "allow" | "block";
-  score: number;
-  flags: string[];
-  reason?: string;
-  bypassed?: boolean;
+  decision: "allow" | "block"
+  score: number
+  flags: string[]
+  reason?: string
+  bypassed?: boolean
 }

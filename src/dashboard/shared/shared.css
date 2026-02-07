@@ -133,7 +133,9 @@ body {
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;
-  transition: transform 160ms ease, background-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
 }
 
 .trace-btn:hover {
@@ -669,7 +671,9 @@ body {
   text-align: left;
   color: inherit;
   cursor: pointer;
-  transition: transform 150ms ease, border-color 150ms ease;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease;
   animation: trace-rise 400ms ease;
 }
 
@@ -869,7 +873,11 @@ body {
   border: 1px dashed color-mix(in srgb, var(--trace-border, #cbd5e1) 70%, transparent);
   border-radius: 0.9rem;
   background:
-    radial-gradient(320px 130px at 50% 0%, color-mix(in srgb, var(--trace-accent, #0f766e) 8%, transparent), transparent 60%),
+    radial-gradient(
+      320px 130px at 50% 0%,
+      color-mix(in srgb, var(--trace-accent, #0f766e) 8%, transparent),
+      transparent 60%
+    ),
     color-mix(in srgb, var(--trace-panel-strong, #fff) 75%, transparent);
   display: flex;
   flex-direction: column;
@@ -1026,8 +1034,16 @@ body {
   }
 
   .trace-table tbody tr.selected {
-    border-color: color-mix(in srgb, var(--trace-accent, #0f766e) 42%, var(--trace-border, #cbd5e1));
-    background: color-mix(in srgb, var(--trace-accent, #0f766e) 10%, var(--trace-panel-strong, #fff));
+    border-color: color-mix(
+      in srgb,
+      var(--trace-accent, #0f766e) 42%,
+      var(--trace-border, #cbd5e1)
+    );
+    background: color-mix(
+      in srgb,
+      var(--trace-accent, #0f766e) 10%,
+      var(--trace-panel-strong, #fff)
+    );
   }
 
   .trace-table td {

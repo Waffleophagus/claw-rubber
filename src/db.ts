@@ -1,142 +1,142 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { Database } from "bun:sqlite";
-import { normalizeDomain } from "./lib/domain-policy";
-import type { EvidenceMatch, SearchResultRecord } from "./types.ts";
+import { mkdirSync } from "node:fs"
+import { dirname } from "node:path"
+import { Database } from "bun:sqlite"
+import { normalizeDomain } from "./lib/domain-policy"
+import type { EvidenceMatch, SearchResultRecord } from "./types.ts"
 
 export interface FetchEventInput {
-  resultId: string;
-  url: string;
-  domain: string;
-  decision: "allow" | "block";
-  score: number;
-  flags: string[];
-  reason: string | null;
-  blockedBy: string | null;
-  allowedBy: string | null;
-  domainAction: "allow-bypass" | "block" | "inspect";
-  mediumThreshold: number;
-  blockThreshold: number;
-  bypassed: boolean;
-  durationMs: number;
-  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
-  searchRequestId?: string | null;
-  searchQuery?: string | null;
-  searchRank?: number | null;
+  resultId: string
+  url: string
+  domain: string
+  decision: "allow" | "block"
+  score: number
+  flags: string[]
+  reason: string | null
+  blockedBy: string | null
+  allowedBy: string | null
+  domainAction: "allow-bypass" | "block" | "inspect"
+  mediumThreshold: number
+  blockThreshold: number
+  bypassed: boolean
+  durationMs: number
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown"
+  searchRequestId?: string | null
+  searchQuery?: string | null
+  searchRank?: number | null
 }
 
 export interface FlaggedPayloadInput {
-  fetchEventId?: number;
-  resultId: string;
-  url: string;
-  domain: string;
-  score: number;
-  flags: string[];
-  reason: string;
-  content: string;
-  evidence?: EvidenceMatch[];
+  fetchEventId?: number
+  resultId: string
+  url: string
+  domain: string
+  score: number
+  flags: string[]
+  reason: string
+  content: string
+  evidence?: EvidenceMatch[]
 }
 
 export interface SearchBlockEventInput {
-  requestId: string;
-  resultId: string;
-  query: string;
-  url: string;
-  domain: string;
-  title: string;
-  source: string;
-  reason: string;
+  requestId: string
+  resultId: string
+  query: string
+  url: string
+  domain: string
+  title: string
+  source: string
+  reason: string
 }
 
-export type DashboardSource = "fetch" | "search";
+export type DashboardSource = "fetch" | "search"
 
 export interface DashboardEventsQuery {
-  from: number;
-  to: number;
-  source: "fetch" | "search" | "all";
-  decision: "allow" | "block" | "all";
-  domainContains?: string;
-  reasonContains?: string;
-  flagContains?: string;
-  allowedByContains?: string;
-  queryContains?: string;
-  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
-  minSearchRank?: number;
-  maxSearchRank?: number;
-  offset: number;
-  limit: number;
+  from: number
+  to: number
+  source: "fetch" | "search" | "all"
+  decision: "allow" | "block" | "all"
+  domainContains?: string
+  reasonContains?: string
+  flagContains?: string
+  allowedByContains?: string
+  queryContains?: string
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown"
+  minSearchRank?: number
+  maxSearchRank?: number
+  offset: number
+  limit: number
 }
 
 export interface DashboardEventRecord {
-  eventId: string;
-  source: DashboardSource;
-  createdAt: number;
-  resultId: string;
-  decision: "allow" | "block";
-  domain: string;
-  url: string | null;
-  reason: string | null;
-  blockedBy: string | null;
-  allowedBy: string | null;
-  flags: string[];
-  score: number;
-  mediumThreshold: number | null;
-  blockThreshold: number | null;
-  bypassed: boolean;
-  durationMs: number | null;
-  title: string | null;
-  query: string | null;
-  requestId: string | null;
-  traceKind: "search-result-fetch" | "direct-web-fetch" | "unknown";
-  searchRank: number | null;
+  eventId: string
+  source: DashboardSource
+  createdAt: number
+  resultId: string
+  decision: "allow" | "block"
+  domain: string
+  url: string | null
+  reason: string | null
+  blockedBy: string | null
+  allowedBy: string | null
+  flags: string[]
+  score: number
+  mediumThreshold: number | null
+  blockThreshold: number | null
+  bypassed: boolean
+  durationMs: number | null
+  title: string | null
+  query: string | null
+  requestId: string | null
+  traceKind: "search-result-fetch" | "direct-web-fetch" | "unknown"
+  searchRank: number | null
 }
 
 export interface DashboardEventDetail extends DashboardEventRecord {
-  payloadContent: string | null;
-  evidence: EvidenceMatch[];
+  payloadContent: string | null
+  evidence: EvidenceMatch[]
 }
 
 export interface DashboardOverview {
-  totalEvents: number;
-  blockedEvents: number;
-  allowedEvents: number;
-  blockedRate: number;
-  uniqueBlockedDomains: number;
+  totalEvents: number
+  blockedEvents: number
+  allowedEvents: number
+  blockedRate: number
+  uniqueBlockedDomains: number
   bySource: {
-    fetch: number;
-    search: number;
-  };
-  topBlockedBy: string | null;
-  topAllowedBy: string | null;
+    fetch: number
+    search: number
+  }
+  topBlockedBy: string | null
+  topAllowedBy: string | null
 }
 
 export interface DashboardTimeseriesPoint {
-  bucketStart: number;
-  total: number;
-  blocked: number;
-  allowed: number;
-  fetch: number;
-  search: number;
+  bucketStart: number
+  total: number
+  blocked: number
+  allowed: number
+  fetch: number
+  search: number
 }
 
 export interface DashboardTopItem {
-  value: string;
-  count: number;
+  value: string
+  count: number
 }
 
 export interface RuntimeAllowlistDomain {
-  domain: string;
-  note: string | null;
-  addedAt: number;
+  domain: string
+  note: string | null
+  addedAt: number
 }
 
 export class AppDb {
-  private readonly db: Database;
+  private readonly db: Database
 
   constructor(path: string) {
-    mkdirSync(dirname(path), { recursive: true });
-    this.db = new Database(path, { create: true, strict: true });
-    this.migrate();
+    mkdirSync(dirname(path), { recursive: true })
+    this.db = new Database(path, { create: true, strict: true })
+    this.migrate()
   }
 
   private migrate(): void {
@@ -230,31 +230,33 @@ export class AppDb {
       CREATE INDEX IF NOT EXISTS idx_search_block_events_created_at ON search_block_events(created_at);
       CREATE INDEX IF NOT EXISTS idx_search_block_events_domain ON search_block_events(domain);
       CREATE INDEX IF NOT EXISTS idx_search_block_events_result_id ON search_block_events(result_id);
-    `);
+    `)
 
-    this.ensureColumn("fetch_events", "url", "TEXT NOT NULL DEFAULT ''");
-    this.ensureColumn("fetch_events", "blocked_by", "TEXT");
-    this.ensureColumn("fetch_events", "allowed_by", "TEXT");
-    this.ensureColumn("fetch_events", "domain_action", "TEXT");
-    this.ensureColumn("fetch_events", "trace_kind", "TEXT NOT NULL DEFAULT 'unknown'");
-    this.ensureColumn("fetch_events", "search_request_id", "TEXT");
-    this.ensureColumn("fetch_events", "search_query", "TEXT");
-    this.ensureColumn("fetch_events", "search_rank", "INTEGER");
-    this.ensureColumn("fetch_events", "medium_threshold", "INTEGER");
-    this.ensureColumn("fetch_events", "block_threshold", "INTEGER");
-    this.ensureColumn("search_results_cache", "search_rank", "INTEGER NOT NULL DEFAULT 0");
-    this.ensureColumn("flagged_payloads", "fetch_event_id", "INTEGER");
-    this.ensureColumn("flagged_payloads", "evidence_json", "TEXT");
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id)`);
+    this.ensureColumn("fetch_events", "url", "TEXT NOT NULL DEFAULT ''")
+    this.ensureColumn("fetch_events", "blocked_by", "TEXT")
+    this.ensureColumn("fetch_events", "allowed_by", "TEXT")
+    this.ensureColumn("fetch_events", "domain_action", "TEXT")
+    this.ensureColumn("fetch_events", "trace_kind", "TEXT NOT NULL DEFAULT 'unknown'")
+    this.ensureColumn("fetch_events", "search_request_id", "TEXT")
+    this.ensureColumn("fetch_events", "search_query", "TEXT")
+    this.ensureColumn("fetch_events", "search_rank", "INTEGER")
+    this.ensureColumn("fetch_events", "medium_threshold", "INTEGER")
+    this.ensureColumn("fetch_events", "block_threshold", "INTEGER")
+    this.ensureColumn("search_results_cache", "search_rank", "INTEGER NOT NULL DEFAULT 0")
+    this.ensureColumn("flagged_payloads", "fetch_event_id", "INTEGER")
+    this.ensureColumn("flagged_payloads", "evidence_json", "TEXT")
+    this.db.exec(
+      `CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id)`,
+    )
   }
 
   storeSearchRequest(requestId: string, query: string, responseJson: unknown): void {
-    const now = Date.now();
+    const now = Date.now()
     const stmt = this.db.prepare(
       `INSERT INTO search_requests (request_id, query, created_at, response_json) VALUES (?, ?, ?, ?)`,
-    );
+    )
 
-    stmt.run(requestId, query, now, JSON.stringify(responseJson));
+    stmt.run(requestId, query, now, JSON.stringify(responseJson))
   }
 
   storeSearchResult(record: SearchResultRecord): void {
@@ -265,7 +267,7 @@ export class AppDb {
           availability, block_reason, created_at, expires_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-    );
+    )
 
     stmt.run(
       record.resultId,
@@ -281,11 +283,11 @@ export class AppDb {
       record.blockReason,
       record.createdAt,
       record.expiresAt,
-    );
+    )
   }
 
   getSearchResult(resultId: string): SearchResultRecord | null {
-    const now = Date.now();
+    const now = Date.now()
     const stmt = this.db.prepare(
       `
         SELECT
@@ -305,28 +307,28 @@ export class AppDb {
         FROM search_results_cache
         WHERE result_id = ? AND expires_at > ?
       `,
-    );
+    )
 
     const row = stmt.get(resultId, now) as
       | {
-          result_id: string;
-          request_id: string;
-          query: string;
-          search_rank: number;
-          url: string;
-          domain: string;
-          title: string;
-          snippet: string;
-          source: string;
-          availability: "allowed" | "blocked";
-          block_reason: string | null;
-          created_at: number;
-          expires_at: number;
+          result_id: string
+          request_id: string
+          query: string
+          search_rank: number
+          url: string
+          domain: string
+          title: string
+          snippet: string
+          source: string
+          availability: "allowed" | "blocked"
+          block_reason: string | null
+          created_at: number
+          expires_at: number
         }
-      | undefined;
+      | undefined
 
     if (!row) {
-      return null;
+      return null
     }
 
     return {
@@ -343,11 +345,11 @@ export class AppDb {
       blockReason: row.block_reason,
       createdAt: row.created_at,
       expiresAt: row.expires_at,
-    };
+    }
   }
 
   storeFetchEvent(event: FetchEventInput): number {
-    const createdAt = Date.now();
+    const createdAt = Date.now()
     const stmt = this.db.prepare(
       `
         INSERT INTO fetch_events (
@@ -356,7 +358,7 @@ export class AppDb {
           medium_threshold, block_threshold, bypassed, duration_ms, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-    );
+    )
 
     const result = stmt.run(
       event.resultId,
@@ -378,9 +380,9 @@ export class AppDb {
       event.bypassed ? 1 : 0,
       event.durationMs,
       createdAt,
-    );
+    )
 
-    return Number(result.lastInsertRowid);
+    return Number(result.lastInsertRowid)
   }
 
   storeFlaggedPayload(payload: FlaggedPayloadInput): void {
@@ -390,7 +392,7 @@ export class AppDb {
           fetch_event_id, result_id, url, domain, score, flags_json, evidence_json, reason, content, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-    );
+    )
 
     stmt.run(
       payload.fetchEventId ?? null,
@@ -403,7 +405,7 @@ export class AppDb {
       payload.reason,
       payload.content,
       Date.now(),
-    );
+    )
   }
 
   storeSearchBlockEvent(event: SearchBlockEventInput): void {
@@ -413,7 +415,7 @@ export class AppDb {
           request_id, result_id, query, url, domain, title, source, reason, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-    );
+    )
 
     stmt.run(
       event.requestId,
@@ -425,17 +427,17 @@ export class AppDb {
       event.source,
       event.reason,
       Date.now(),
-    );
+    )
   }
 
   addRuntimeAllowlistDomain(domain: string, note?: string): RuntimeAllowlistDomain {
-    const normalized = normalizeDomain(domain).replace(/^\*\./, "");
+    const normalized = normalizeDomain(domain).replace(/^\*\./, "")
     if (!isValidDomainEntry(normalized)) {
-      throw new Error("Invalid domain");
+      throw new Error("Invalid domain")
     }
 
-    const addedAt = Date.now();
-    const trimmedNote = note?.trim() ? note.trim() : null;
+    const addedAt = Date.now()
+    const trimmedNote = note?.trim() ? note.trim() : null
     const stmt = this.db.prepare(
       `
         INSERT INTO runtime_allowlist_domains (domain, note, added_at)
@@ -444,10 +446,10 @@ export class AppDb {
           note = excluded.note,
           added_at = excluded.added_at
       `,
-    );
+    )
 
-    stmt.run(normalized, trimmedNote, addedAt);
-    return { domain: normalized, note: trimmedNote, addedAt };
+    stmt.run(normalized, trimmedNote, addedAt)
+    return { domain: normalized, note: trimmedNote, addedAt }
   }
 
   listRuntimeAllowlistDomains(): RuntimeAllowlistDomain[] {
@@ -459,27 +461,30 @@ export class AppDb {
           ORDER BY domain ASC
         `,
       )
-      .all() as Array<{ domain: string; note: string | null; added_at: number }>;
+      .all() as Array<{ domain: string; note: string | null; added_at: number }>
 
     return rows.map((row) => ({
       domain: row.domain,
       note: row.note,
       addedAt: row.added_at,
-    }));
+    }))
   }
 
   getEffectiveAllowlist(staticAllowlist: string[]): string[] {
-    const combined = new Set<string>(staticAllowlist.map((domain) => normalizeDomain(domain)));
+    const combined = new Set<string>(staticAllowlist.map((domain) => normalizeDomain(domain)))
     for (const runtime of this.listRuntimeAllowlistDomains()) {
-      combined.add(runtime.domain);
+      combined.add(runtime.domain)
     }
-    return [...combined];
+    return [...combined]
   }
 
-  getDashboardEvents(query: DashboardEventsQuery): { total: number; events: DashboardEventRecord[] } {
-    const all = this.getDashboardEventsUnpaginated(query);
-    const events = all.slice(query.offset, query.offset + query.limit);
-    return { total: all.length, events };
+  getDashboardEvents(query: DashboardEventsQuery): {
+    total: number
+    events: DashboardEventRecord[]
+  } {
+    const all = this.getDashboardEventsUnpaginated(query)
+    const events = all.slice(query.offset, query.offset + query.limit)
+    return { total: all.length, events }
   }
 
   getDashboardOverview(query: Omit<DashboardEventsQuery, "offset" | "limit">): DashboardOverview {
@@ -487,49 +492,49 @@ export class AppDb {
       ...query,
       offset: 0,
       limit: Number.MAX_SAFE_INTEGER,
-    });
-    const blocked = events.filter((event) => event.decision === "block");
-    const allowed = events.filter((event) => event.decision === "allow");
-    const uniqueBlockedDomains = new Set(blocked.map((event) => event.domain)).size;
+    })
+    const blocked = events.filter((event) => event.decision === "block")
+    const allowed = events.filter((event) => event.decision === "allow")
+    const uniqueBlockedDomains = new Set(blocked.map((event) => event.domain)).size
 
-    const blockedByCounts = new Map<string, number>();
+    const blockedByCounts = new Map<string, number>()
     for (const event of blocked) {
       if (!event.blockedBy) {
-        continue;
+        continue
       }
-      blockedByCounts.set(event.blockedBy, (blockedByCounts.get(event.blockedBy) ?? 0) + 1);
+      blockedByCounts.set(event.blockedBy, (blockedByCounts.get(event.blockedBy) ?? 0) + 1)
     }
 
-    let topBlockedBy: string | null = null;
-    let topBlockedByCount = -1;
+    let topBlockedBy: string | null = null
+    let topBlockedByCount = -1
     for (const [key, value] of blockedByCounts.entries()) {
       if (value > topBlockedByCount) {
-        topBlockedBy = key;
-        topBlockedByCount = value;
+        topBlockedBy = key
+        topBlockedByCount = value
       }
     }
 
-    const allowedByCounts = new Map<string, number>();
+    const allowedByCounts = new Map<string, number>()
     for (const event of allowed) {
       if (!event.allowedBy) {
-        continue;
+        continue
       }
-      allowedByCounts.set(event.allowedBy, (allowedByCounts.get(event.allowedBy) ?? 0) + 1);
+      allowedByCounts.set(event.allowedBy, (allowedByCounts.get(event.allowedBy) ?? 0) + 1)
     }
 
-    let topAllowedBy: string | null = null;
-    let topAllowedByCount = -1;
+    let topAllowedBy: string | null = null
+    let topAllowedByCount = -1
     for (const [key, value] of allowedByCounts.entries()) {
       if (value > topAllowedByCount) {
-        topAllowedBy = key;
-        topAllowedByCount = value;
+        topAllowedBy = key
+        topAllowedByCount = value
       }
     }
 
     const bySource = {
       fetch: events.filter((event) => event.source === "fetch").length,
       search: events.filter((event) => event.source === "search").length,
-    };
+    }
 
     return {
       totalEvents: events.length,
@@ -540,7 +545,7 @@ export class AppDb {
       bySource,
       topBlockedBy,
       topAllowedBy,
-    };
+    }
   }
 
   getDashboardTimeseries(
@@ -551,11 +556,11 @@ export class AppDb {
       ...query,
       offset: 0,
       limit: Number.MAX_SAFE_INTEGER,
-    });
-    const buckets = new Map<number, DashboardTimeseriesPoint>();
+    })
+    const buckets = new Map<number, DashboardTimeseriesPoint>()
 
     for (const event of events) {
-      const bucketStart = Math.floor(event.createdAt / bucketMs) * bucketMs;
+      const bucketStart = Math.floor(event.createdAt / bucketMs) * bucketMs
       if (!buckets.has(bucketStart)) {
         buckets.set(bucketStart, {
           bucketStart,
@@ -564,25 +569,25 @@ export class AppDb {
           allowed: 0,
           fetch: 0,
           search: 0,
-        });
+        })
       }
 
-      const point = buckets.get(bucketStart)!;
-      point.total += 1;
+      const point = buckets.get(bucketStart)!
+      point.total += 1
       if (event.decision === "block") {
-        point.blocked += 1;
+        point.blocked += 1
       } else {
-        point.allowed += 1;
+        point.allowed += 1
       }
 
       if (event.source === "fetch") {
-        point.fetch += 1;
+        point.fetch += 1
       } else {
-        point.search += 1;
+        point.search += 1
       }
     }
 
-    return [...buckets.values()].sort((a, b) => a.bucketStart - b.bucketStart);
+    return [...buckets.values()].sort((a, b) => a.bucketStart - b.bucketStart)
   }
 
   getDashboardTopDomains(
@@ -597,7 +602,7 @@ export class AppDb {
       }),
       (event) => event.domain,
       limit,
-    );
+    )
   }
 
   getDashboardTopReasons(
@@ -612,7 +617,7 @@ export class AppDb {
       }),
       (event) => event.reason,
       limit,
-    );
+    )
   }
 
   getDashboardTopFlags(
@@ -623,18 +628,18 @@ export class AppDb {
       ...query,
       offset: 0,
       limit: Number.MAX_SAFE_INTEGER,
-    });
-    const counter = new Map<string, number>();
+    })
+    const counter = new Map<string, number>()
     for (const event of events) {
       for (const flag of event.flags) {
-        counter.set(flag, (counter.get(flag) ?? 0) + 1);
+        counter.set(flag, (counter.get(flag) ?? 0) + 1)
       }
     }
 
     return [...counter.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, limit)
-      .map(([value, count]) => ({ value, count }));
+      .map(([value, count]) => ({ value, count }))
   }
 
   getDashboardTopAllowedBy(
@@ -649,14 +654,14 @@ export class AppDb {
       }).filter((event) => event.decision === "allow"),
       (event) => event.allowedBy,
       limit,
-    );
+    )
   }
 
   getDashboardEventDetail(eventId: string): DashboardEventDetail | null {
-    const [source, rawId] = eventId.split(":", 2);
-    const id = Number.parseInt(rawId ?? "", 10);
+    const [source, rawId] = eventId.split(":", 2)
+    const id = Number.parseInt(rawId ?? "", 10)
     if (Number.isNaN(id)) {
-      return null;
+      return null
     }
 
     if (source === "fetch") {
@@ -693,33 +698,33 @@ export class AppDb {
         )
         .get(id) as
         | {
-            id: number;
-            result_id: string;
-            domain: string;
-            url: string;
-            decision: "allow" | "block";
-            score: number;
-            flags_json: string;
-            reason: string | null;
-            blocked_by: string | null;
-            allowed_by: string | null;
-            trace_kind: string | null;
-            search_request_id: string | null;
-            search_query: string | null;
-            search_rank: number | null;
-            medium_threshold: number | null;
-            block_threshold: number | null;
-            bypassed: number;
-            duration_ms: number;
-            created_at: number;
-            fallback_request_id: string | null;
-            fallback_query: string | null;
-            fallback_rank: number | null;
+            id: number
+            result_id: string
+            domain: string
+            url: string
+            decision: "allow" | "block"
+            score: number
+            flags_json: string
+            reason: string | null
+            blocked_by: string | null
+            allowed_by: string | null
+            trace_kind: string | null
+            search_request_id: string | null
+            search_query: string | null
+            search_rank: number | null
+            medium_threshold: number | null
+            block_threshold: number | null
+            bypassed: number
+            duration_ms: number
+            created_at: number
+            fallback_request_id: string | null
+            fallback_query: string | null
+            fallback_rank: number | null
           }
-        | undefined;
+        | undefined
 
       if (!fetchRow) {
-        return null;
+        return null
       }
 
       const payload = this.db
@@ -733,7 +738,7 @@ export class AppDb {
             LIMIT 1
           `,
         )
-        .get(fetchRow.id) as { content: string; evidence_json: string | null } | undefined;
+        .get(fetchRow.id) as { content: string; evidence_json: string | null } | undefined
 
       const fallbackPayload = payload
         ? null
@@ -748,7 +753,9 @@ export class AppDb {
                 LIMIT 1
               `,
             )
-            .get(fetchRow.result_id) as { content: string; evidence_json: string | null } | undefined);
+            .get(fetchRow.result_id) as
+            | { content: string; evidence_json: string | null }
+            | undefined)
 
       return {
         eventId: `fetch:${fetchRow.id}`,
@@ -774,7 +781,7 @@ export class AppDb {
         searchRank: fetchRow.search_rank ?? fetchRow.fallback_rank ?? null,
         payloadContent: payload?.content ?? fallbackPayload?.content ?? null,
         evidence: parseEvidence(payload?.evidence_json ?? fallbackPayload?.evidence_json ?? null),
-      };
+      }
     }
 
     if (source === "search") {
@@ -797,20 +804,20 @@ export class AppDb {
         )
         .get(id) as
         | {
-            id: number;
-            request_id: string;
-            result_id: string;
-            query: string;
-            url: string;
-            domain: string;
-            title: string;
-            reason: string;
-            created_at: number;
+            id: number
+            request_id: string
+            result_id: string
+            query: string
+            url: string
+            domain: string
+            title: string
+            reason: string
+            created_at: number
           }
-        | undefined;
+        | undefined
 
       if (!searchRow) {
-        return null;
+        return null
       }
 
       return {
@@ -837,47 +844,47 @@ export class AppDb {
         searchRank: null,
         payloadContent: null,
         evidence: [],
-      };
+      }
     }
 
-    return null;
+    return null
   }
 
   purgeExpiredData(retentionDays: number): void {
-    const now = Date.now();
-    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+    const now = Date.now()
+    const retentionMs = retentionDays * 24 * 60 * 60 * 1000
 
-    this.db.prepare(`DELETE FROM search_results_cache WHERE expires_at <= ?`).run(now);
-    this.db.prepare(`DELETE FROM flagged_payloads WHERE created_at <= ?`).run(now - retentionMs);
-    this.db.prepare(`DELETE FROM fetch_events WHERE created_at <= ?`).run(now - retentionMs);
-    this.db.prepare(`DELETE FROM search_block_events WHERE created_at <= ?`).run(now - retentionMs);
-    this.db.prepare(`DELETE FROM search_requests WHERE created_at <= ?`).run(now - retentionMs);
+    this.db.prepare(`DELETE FROM search_results_cache WHERE expires_at <= ?`).run(now)
+    this.db.prepare(`DELETE FROM flagged_payloads WHERE created_at <= ?`).run(now - retentionMs)
+    this.db.prepare(`DELETE FROM fetch_events WHERE created_at <= ?`).run(now - retentionMs)
+    this.db.prepare(`DELETE FROM search_block_events WHERE created_at <= ?`).run(now - retentionMs)
+    this.db.prepare(`DELETE FROM search_requests WHERE created_at <= ?`).run(now - retentionMs)
   }
 
   private ensureColumn(tableName: string, columnName: string, columnDefinition: string): void {
     if (this.hasColumn(tableName, columnName)) {
-      return;
+      return
     }
 
-    this.db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
+    this.db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`)
   }
 
   private hasColumn(tableName: string, columnName: string): boolean {
-    const rows = this.db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
-    return rows.some((row) => row.name === columnName);
+    const rows = this.db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>
+    return rows.some((row) => row.name === columnName)
   }
 
   private getDashboardEventsUnpaginated(query: DashboardEventsQuery): DashboardEventRecord[] {
-    const fetchEvents = query.source === "search"
-      ? []
-      : this.getFetchEventsInRange(query.from, query.to);
-    const searchEvents = query.source === "fetch"
-      ? []
-      : this.getSearchBlockEventsInRange(query.from, query.to);
+    const fetchEvents =
+      query.source === "search" ? [] : this.getFetchEventsInRange(query.from, query.to)
+    const searchEvents =
+      query.source === "fetch" ? [] : this.getSearchBlockEventsInRange(query.from, query.to)
 
-    const combined = [...fetchEvents, ...searchEvents].filter((event) => this.matchesDashboardFilters(event, query));
-    combined.sort((a, b) => b.createdAt - a.createdAt || a.eventId.localeCompare(b.eventId));
-    return combined;
+    const combined = [...fetchEvents, ...searchEvents].filter((event) =>
+      this.matchesDashboardFilters(event, query),
+    )
+    combined.sort((a, b) => b.createdAt - a.createdAt || a.eventId.localeCompare(b.eventId))
+    return combined
   }
 
   private getFetchEventsInRange(from: number, to: number): DashboardEventRecord[] {
@@ -913,29 +920,29 @@ export class AppDb {
         `,
       )
       .all(from, to) as Array<{
-      id: number;
-      result_id: string;
-      domain: string;
-      url: string;
-      decision: "allow" | "block";
-      score: number;
-      flags_json: string;
-      reason: string | null;
-      blocked_by: string | null;
-      allowed_by: string | null;
-      trace_kind: string | null;
-      search_request_id: string | null;
-      search_query: string | null;
-      search_rank: number | null;
-      medium_threshold: number | null;
-      block_threshold: number | null;
-      bypassed: number;
-      duration_ms: number;
-      created_at: number;
-      fallback_request_id: string | null;
-      fallback_query: string | null;
-      fallback_rank: number | null;
-    }>;
+      id: number
+      result_id: string
+      domain: string
+      url: string
+      decision: "allow" | "block"
+      score: number
+      flags_json: string
+      reason: string | null
+      blocked_by: string | null
+      allowed_by: string | null
+      trace_kind: string | null
+      search_request_id: string | null
+      search_query: string | null
+      search_rank: number | null
+      medium_threshold: number | null
+      block_threshold: number | null
+      bypassed: number
+      duration_ms: number
+      created_at: number
+      fallback_request_id: string | null
+      fallback_query: string | null
+      fallback_rank: number | null
+    }>
 
     return rows.map((row) => ({
       eventId: `fetch:${row.id}`,
@@ -959,7 +966,7 @@ export class AppDb {
       requestId: row.search_request_id ?? row.fallback_request_id ?? null,
       traceKind: normalizeTraceKind(row.trace_kind, row.fallback_request_id),
       searchRank: row.search_rank ?? row.fallback_rank ?? null,
-    }));
+    }))
   }
 
   private getSearchBlockEventsInRange(from: number, to: number): DashboardEventRecord[] {
@@ -981,16 +988,16 @@ export class AppDb {
         `,
       )
       .all(from, to) as Array<{
-      id: number;
-      request_id: string;
-      result_id: string;
-      query: string;
-      url: string;
-      domain: string;
-      title: string;
-      reason: string;
-      created_at: number;
-    }>;
+      id: number
+      request_id: string
+      result_id: string
+      query: string
+      url: string
+      domain: string
+      title: string
+      reason: string
+      created_at: number
+    }>
 
     return rows.map((row) => ({
       eventId: `search:${row.id}`,
@@ -1014,67 +1021,70 @@ export class AppDb {
       requestId: row.request_id,
       traceKind: "unknown",
       searchRank: null,
-    }));
+    }))
   }
 
-  private matchesDashboardFilters(event: DashboardEventRecord, query: DashboardEventsQuery): boolean {
+  private matchesDashboardFilters(
+    event: DashboardEventRecord,
+    query: DashboardEventsQuery,
+  ): boolean {
     if (query.decision !== "all" && event.decision !== query.decision) {
-      return false;
+      return false
     }
 
     if (query.domainContains) {
-      const needle = query.domainContains.toLowerCase();
+      const needle = query.domainContains.toLowerCase()
       if (!event.domain.toLowerCase().includes(needle)) {
-        return false;
+        return false
       }
     }
 
     if (query.reasonContains) {
-      const needle = query.reasonContains.toLowerCase();
+      const needle = query.reasonContains.toLowerCase()
       if (!(event.reason ?? "").toLowerCase().includes(needle)) {
-        return false;
+        return false
       }
     }
 
     if (query.flagContains) {
-      const needle = query.flagContains.toLowerCase();
-      const hasFlag = event.flags.some((flag) => flag.toLowerCase().includes(needle));
+      const needle = query.flagContains.toLowerCase()
+      const hasFlag = event.flags.some((flag) => flag.toLowerCase().includes(needle))
       if (!hasFlag) {
-        return false;
+        return false
       }
     }
 
     if (query.allowedByContains) {
-      const needle = query.allowedByContains.toLowerCase();
+      const needle = query.allowedByContains.toLowerCase()
       if (!(event.allowedBy ?? "").toLowerCase().includes(needle)) {
-        return false;
+        return false
       }
     }
 
     if (query.queryContains) {
-      const needle = query.queryContains.toLowerCase();
+      const needle = query.queryContains.toLowerCase()
       if (!(event.query ?? "").toLowerCase().includes(needle)) {
-        return false;
+        return false
       }
     }
 
     if (query.traceKind && event.traceKind !== query.traceKind) {
-      return false;
+      return false
     }
 
     if (query.minSearchRank !== undefined) {
       if (event.searchRank === null || event.searchRank < query.minSearchRank) {
-        return false;
+        return false
       }
     }
 
     if (query.maxSearchRank !== undefined) {
       if (event.searchRank === null || event.searchRank > query.maxSearchRank) {
-        return false;
+        return false
       }
     }
 
-    return true;
+    return true
   }
 
   private getTopItems(
@@ -1082,51 +1092,51 @@ export class AppDb {
     picker: (event: DashboardEventRecord) => string | null,
     limit: number,
   ): DashboardTopItem[] {
-    const counter = new Map<string, number>();
+    const counter = new Map<string, number>()
     for (const event of events) {
-      const value = picker(event)?.trim();
+      const value = picker(event)?.trim()
       if (!value) {
-        continue;
+        continue
       }
-      counter.set(value, (counter.get(value) ?? 0) + 1);
+      counter.set(value, (counter.get(value) ?? 0) + 1)
     }
 
     return [...counter.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, limit)
-      .map(([value, count]) => ({ value, count }));
+      .map(([value, count]) => ({ value, count }))
   }
 }
 
 function parseFlags(input: string): string[] {
   try {
-    const parsed = JSON.parse(input) as unknown;
+    const parsed = JSON.parse(input) as unknown
     if (!Array.isArray(parsed)) {
-      return [];
+      return []
     }
 
-    return parsed.filter((item): item is string => typeof item === "string");
+    return parsed.filter((item): item is string => typeof item === "string")
   } catch {
-    return [];
+    return []
   }
 }
 
 function parseEvidence(input: string | null): EvidenceMatch[] {
   if (!input) {
-    return [];
+    return []
   }
 
   try {
-    const parsed = JSON.parse(input) as unknown;
+    const parsed = JSON.parse(input) as unknown
     if (!Array.isArray(parsed)) {
-      return [];
+      return []
     }
 
     return parsed
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
       .map((item, index) => {
-        const start = typeof item.start === "number" ? item.start : null;
-        const end = typeof item.end === "number" ? item.end : null;
+        const start = typeof item.start === "number" ? item.start : null
+        const end = typeof item.end === "number" ? item.end : null
         return {
           id: typeof item.id === "string" ? item.id : `evidence-${index}`,
           flag: typeof item.flag === "string" ? item.flag : "unknown",
@@ -1138,19 +1148,24 @@ function parseEvidence(input: string | null): EvidenceMatch[] {
           excerpt: typeof item.excerpt === "string" ? item.excerpt : "",
           weight: typeof item.weight === "number" ? item.weight : 0,
           notes: typeof item.notes === "string" ? item.notes : undefined,
-        } satisfies EvidenceMatch;
-      });
+        } satisfies EvidenceMatch
+      })
   } catch {
-    return [];
+    return []
   }
 }
 
 function toDetector(value: unknown): EvidenceMatch["detector"] {
-  if (value === "rule" || value === "encoding" || value === "typoglycemia" || value === "normalization") {
-    return value;
+  if (
+    value === "rule" ||
+    value === "encoding" ||
+    value === "typoglycemia" ||
+    value === "normalization"
+  ) {
+    return value
   }
 
-  return "rule";
+  return "rule"
 }
 
 function normalizeTraceKind(
@@ -1158,20 +1173,20 @@ function normalizeTraceKind(
   fallbackRequestId: string | null,
 ): "search-result-fetch" | "direct-web-fetch" | "unknown" {
   if (raw === "search-result-fetch" || raw === "direct-web-fetch") {
-    return raw;
+    return raw
   }
 
   if (fallbackRequestId) {
-    return "search-result-fetch";
+    return "search-result-fetch"
   }
 
-  return "unknown";
+  return "unknown"
 }
 
 function isValidDomainEntry(domain: string): boolean {
   if (!domain || domain.length > 255) {
-    return false;
+    return false
   }
 
-  return /^[a-z0-9.-]+$/.test(domain);
+  return /^[a-z0-9.-]+$/.test(domain)
 }

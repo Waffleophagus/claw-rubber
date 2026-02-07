@@ -1,26 +1,26 @@
-import { z } from "zod";
-import { errorResponse, jsonResponse, readJsonBody } from "../lib/http";
-import type { ServerContext } from "../server-context";
-import { processFetchedPage } from "../services/fetch-processing";
+import { z } from "zod"
+import { errorResponse, jsonResponse, readJsonBody } from "../lib/http"
+import type { ServerContext } from "../server-context"
+import { processFetchedPage } from "../services/fetch-processing"
 
 const FetchRequestSchema = z.object({
   result_id: z.string().uuid(),
-});
+})
 
 export async function handleFetch(request: Request, ctx: ServerContext): Promise<Response> {
-  const started = Date.now();
-  const payload = await readJsonBody(request);
-  const parsed = FetchRequestSchema.safeParse(payload);
+  const started = Date.now()
+  const payload = await readJsonBody(request)
+  const parsed = FetchRequestSchema.safeParse(payload)
 
   if (!parsed.success) {
-    return errorResponse(400, "Invalid fetch payload", parsed.error.flatten());
+    return errorResponse(400, "Invalid fetch payload", parsed.error.flatten())
   }
 
-  const resultId = parsed.data.result_id;
-  const record = ctx.db.getSearchResult(resultId);
+  const resultId = parsed.data.result_id
+  const record = ctx.db.getSearchResult(resultId)
 
   if (!record) {
-    return errorResponse(404, "Unknown or expired result_id");
+    return errorResponse(404, "Unknown or expired result_id")
   }
 
   try {
@@ -37,7 +37,7 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
         query: record.query,
         rank: record.rank ?? null,
       },
-    });
+    })
 
     if (processed.kind === "block") {
       return jsonResponse(
@@ -54,7 +54,7 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
           safety: processed.safety,
         },
         422,
-      );
+      )
     }
 
     const payload: Record<string, unknown> = {
@@ -68,16 +68,16 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
         rendered: processed.source.rendered,
         fallback_used: processed.source.fallback_used,
       },
-    };
-
-    if (ctx.config.exposeSafeContentUrls) {
-      payload.url = record.url;
-      payload.final_url = processed.source.final_url;
     }
 
-    return jsonResponse(payload);
+    if (ctx.config.exposeSafeContentUrls) {
+      payload.url = record.url
+      payload.final_url = processed.source.final_url
+    }
+
+    return jsonResponse(payload)
   } catch (error) {
-    ctx.loggers.app.error({ error, resultId, url: record.url }, "fetch request failed");
-    return errorResponse(502, "Failed to fetch upstream page content");
+    ctx.loggers.app.error({ error, resultId, url: record.url }, "fetch request failed")
+    return errorResponse(502, "Failed to fetch upstream page content")
   }
 }

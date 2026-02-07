@@ -1,64 +1,64 @@
-import { z } from "zod";
+import { z } from "zod"
 
-export type ProfileName = "baseline" | "strict" | "paranoid";
-export type WebsiteRendererBackend = "none" | "browserless";
-export type BrowserlessWaitUntil = "domcontentloaded" | "load" | "networkidle";
-export type BraveRateLimitTier = "free" | "paid" | "base" | "pro";
+export type ProfileName = "baseline" | "strict" | "paranoid"
+export type WebsiteRendererBackend = "none" | "browserless"
+export type BrowserlessWaitUntil = "domcontentloaded" | "load" | "networkidle"
+export type BraveRateLimitTier = "free" | "paid" | "base" | "pro"
 
 export interface ProfileSettings {
-  mediumThreshold: number;
-  blockThreshold: number;
-  maxFetchBytes: number;
-  maxExtractedChars: number;
-  fetchTimeoutMs: number;
-  maxRedirects: number;
+  mediumThreshold: number
+  blockThreshold: number
+  maxFetchBytes: number
+  maxExtractedChars: number
+  fetchTimeoutMs: number
+  maxRedirects: number
 }
 
 export interface BrowserlessSettings {
-  baseUrl: string;
-  token: string;
-  timeoutMs: number;
-  waitUntil: BrowserlessWaitUntil;
-  waitForSelector: string;
-  maxHtmlBytes: number;
-  fallbackToHttp: boolean;
-  blockAds: boolean;
+  baseUrl: string
+  token: string
+  timeoutMs: number
+  waitUntil: BrowserlessWaitUntil
+  waitForSelector: string
+  maxHtmlBytes: number
+  fallbackToHttp: boolean
+  blockAds: boolean
 }
 
 export interface BraveRateLimitSettings {
-  tier: BraveRateLimitTier | "custom";
-  requestsPerSecond: number;
-  queueMax: number;
-  retryOn429: boolean;
-  retryMax: number;
+  tier: BraveRateLimitTier | "custom"
+  requestsPerSecond: number
+  queueMax: number
+  retryOn429: boolean
+  retryMax: number
 }
 
 export interface AppConfig {
-  port: number;
-  host: string;
-  braveApiKey: string;
-  braveApiBaseUrl: string;
-  braveRateLimit: BraveRateLimitSettings;
-  profile: ProfileName;
-  profileSettings: ProfileSettings;
-  redactedUrls: boolean;
-  exposeSafeContentUrls: boolean;
-  failClosed: boolean;
-  allowlistDomains: string[];
-  blocklistDomains: string[];
-  languageNameAllowlistExtra: string[];
-  dbPath: string;
-  logDir: string;
-  resultTtlMs: number;
-  retentionDays: number;
-  llmJudgeEnabled: boolean;
-  llmProvider: "openai" | "ollama";
-  llmModel: string;
-  openaiApiKey: string;
-  ollamaBaseUrl: string;
-  userAgent: string;
-  websiteRendererBackend: WebsiteRendererBackend;
-  browserless: BrowserlessSettings;
+  port: number
+  host: string
+  braveApiKey: string
+  braveApiBaseUrl: string
+  braveRateLimit: BraveRateLimitSettings
+  profile: ProfileName
+  profileSettings: ProfileSettings
+  redactedUrls: boolean
+  exposeSafeContentUrls: boolean
+  failClosed: boolean
+  allowlistDomains: string[]
+  blocklistDomains: string[]
+  languageNameAllowlistExtra: string[]
+  dbPath: string
+  logDir: string
+  resultTtlMs: number
+  retentionDays: number
+  llmJudgeEnabled: boolean
+  llmProvider: "openai" | "ollama"
+  llmModel: string
+  openaiApiKey: string
+  ollamaBaseUrl: string
+  userAgent: string
+  websiteRendererBackend: WebsiteRendererBackend
+  browserless: BrowserlessSettings
 }
 
 const profiles: Record<ProfileName, ProfileSettings> = {
@@ -86,31 +86,31 @@ const profiles: Record<ProfileName, ProfileSettings> = {
     fetchTimeoutMs: 6_000,
     maxRedirects: 2,
   },
-};
+}
 
 const braveTierRps: Record<BraveRateLimitTier, number> = {
   free: 1,
   paid: 20,
   base: 20,
   pro: 50,
-};
+}
 
-const RateLimitTierSchema = z.enum(["free", "paid", "base", "pro"]);
+const RateLimitTierSchema = z.enum(["free", "paid", "base", "pro"])
 const RateLimitSettingSchema = z.preprocess(
   (value) => {
     if (typeof value !== "string") {
-      return value;
+      return value
     }
 
-    const normalized = value.trim().toLowerCase();
+    const normalized = value.trim().toLowerCase()
     if (/^\d+$/.test(normalized)) {
-      return Number.parseInt(normalized, 10);
+      return Number.parseInt(normalized, 10)
     }
 
-    return normalized;
+    return normalized
   },
   z.union([RateLimitTierSchema, z.number().int().positive()]),
-);
+)
 
 const EnvSchema = z.object({
   PORT: z.string().optional(),
@@ -142,87 +142,98 @@ const EnvSchema = z.object({
   CLAWRUBBER_BROWSERLESS_URL: z.string().default("http://browserless:3000"),
   CLAWRUBBER_BROWSERLESS_TOKEN: z.string().default(""),
   CLAWRUBBER_BROWSERLESS_TIMEOUT_MS: z.string().optional(),
-  CLAWRUBBER_BROWSERLESS_WAIT_UNTIL: z.enum(["domcontentloaded", "load", "networkidle"]).default("networkidle"),
+  CLAWRUBBER_BROWSERLESS_WAIT_UNTIL: z
+    .enum(["domcontentloaded", "load", "networkidle"])
+    .default("networkidle"),
   CLAWRUBBER_BROWSERLESS_WAIT_FOR_SELECTOR: z.string().default(""),
   CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES: z.string().optional(),
   CLAWRUBBER_BROWSERLESS_FALLBACK_TO_HTTP: z.string().optional(),
   CLAWRUBBER_BROWSERLESS_BLOCK_ADS: z.string().optional(),
-});
+})
 
 function toBoolean(input: string | undefined, defaultValue: boolean): boolean {
   if (input === undefined) {
-    return defaultValue;
+    return defaultValue
   }
 
-  const normalized = input.trim().toLowerCase();
+  const normalized = input.trim().toLowerCase()
   if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
+    return true
   }
 
   if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
+    return false
   }
 
-  return defaultValue;
+  return defaultValue
 }
 
 function toInteger(input: string | undefined, defaultValue: number): number {
   if (!input) {
-    return defaultValue;
+    return defaultValue
   }
 
-  const parsed = Number.parseInt(input, 10);
+  const parsed = Number.parseInt(input, 10)
   if (Number.isNaN(parsed)) {
-    return defaultValue;
+    return defaultValue
   }
 
-  return parsed;
+  return parsed
 }
 
 function toMinInteger(input: string | undefined, defaultValue: number, min: number): number {
-  const parsed = toInteger(input, defaultValue);
-  return parsed < min ? min : parsed;
+  const parsed = toInteger(input, defaultValue)
+  return parsed < min ? min : parsed
 }
 
 function parseDomainList(input: string | undefined): string[] {
   if (!input) {
-    return [];
+    return []
   }
 
-  return [...new Set(input
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .map((item) => item.replace(/^\*\./, ""))
-    .map((item) => item.replace(/\.+$/, ""))
-    .filter((item) => item.length > 0))];
+  return [
+    ...new Set(
+      input
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .map((item) => item.replace(/^\*\./, ""))
+        .map((item) => item.replace(/\.+$/, ""))
+        .filter((item) => item.length > 0),
+    ),
+  ]
 }
 
 function parseLanguageNameList(input: string | undefined): string[] {
   if (!input) {
-    return [];
+    return []
   }
 
-  return [...new Set(input
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0)
-    .map((item) => item.normalize("NFKC").toLowerCase())
-    .filter((item) => item.length > 1 && item.length <= 80))];
+  return [
+    ...new Set(
+      input
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+        .map((item) => item.normalize("NFKC").toLowerCase())
+        .filter((item) => item.length > 1 && item.length <= 80),
+    ),
+  ]
 }
 
 export function loadConfig(env = process.env): AppConfig {
-  const parsed = EnvSchema.parse(env);
-  const profileSettings = profiles[parsed.CLAWRUBBER_PROFILE];
-  const maxHtmlBytes = toInteger(parsed.CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES, 1_500_000);
-  const braveRateLimit = typeof parsed.CLAWRUBBER_RATE_LIMIT === "number"
-    ? {
-        tier: "custom" as const,
-        requestsPerSecond: parsed.CLAWRUBBER_RATE_LIMIT,
-      }
-    : {
-        tier: parsed.CLAWRUBBER_RATE_LIMIT as BraveRateLimitTier,
-        requestsPerSecond: braveTierRps[parsed.CLAWRUBBER_RATE_LIMIT as BraveRateLimitTier],
-      };
+  const parsed = EnvSchema.parse(env)
+  const profileSettings = profiles[parsed.CLAWRUBBER_PROFILE]
+  const maxHtmlBytes = toInteger(parsed.CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES, 1_500_000)
+  const braveRateLimit =
+    typeof parsed.CLAWRUBBER_RATE_LIMIT === "number"
+      ? {
+          tier: "custom" as const,
+          requestsPerSecond: parsed.CLAWRUBBER_RATE_LIMIT,
+        }
+      : {
+          tier: parsed.CLAWRUBBER_RATE_LIMIT as BraveRateLimitTier,
+          requestsPerSecond: braveTierRps[parsed.CLAWRUBBER_RATE_LIMIT as BraveRateLimitTier],
+        }
 
   return {
     port: toInteger(parsed.PORT, 3000),
@@ -243,7 +254,9 @@ export function loadConfig(env = process.env): AppConfig {
     failClosed: toBoolean(parsed.CLAWRUBBER_FAIL_CLOSED, true),
     allowlistDomains: parseDomainList(parsed.CLAWRUBBER_ALLOWLIST_DOMAINS),
     blocklistDomains: parseDomainList(parsed.CLAWRUBBER_BLOCKLIST_DOMAINS),
-    languageNameAllowlistExtra: parseLanguageNameList(parsed.CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA),
+    languageNameAllowlistExtra: parseLanguageNameList(
+      parsed.CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA,
+    ),
     dbPath: parsed.CLAWRUBBER_DB_PATH,
     logDir: parsed.CLAWRUBBER_LOG_DIR,
     resultTtlMs: toInteger(parsed.CLAWRUBBER_RESULT_TTL_MINUTES, 30) * 60 * 1000,
@@ -265,5 +278,5 @@ export function loadConfig(env = process.env): AppConfig {
       fallbackToHttp: toBoolean(parsed.CLAWRUBBER_BROWSERLESS_FALLBACK_TO_HTTP, true),
       blockAds: toBoolean(parsed.CLAWRUBBER_BROWSERLESS_BLOCK_ADS, true),
     },
-  };
+  }
 }

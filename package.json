@@ -9,16 +9,26 @@
     "test": "bun test",
     "test:integration": "bash scripts/test-integration.sh",
     "typecheck": "bunx tsc --noEmit",
-    "db:seed": "bun scripts/seed-db.ts"
+    "db:seed": "bun scripts/seed-db.ts",
+    "lint": "bunx eslint .",
+    "lint:fix": "bunx eslint . --fix",
+    "format": "bunx prettier . --write",
+    "format:check": "bunx prettier . --check"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
-    "@types/turndown": "^5.0.6"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "@types/turndown": "^5.0.6",
+    "eslint": "9.39.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.3.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.25",

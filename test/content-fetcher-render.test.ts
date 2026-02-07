@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
-import type { AppConfig } from "../src/config";
-import { ContentFetcher } from "../src/services/content-fetcher";
+import { describe, expect, test } from "bun:test"
+import type { AppConfig } from "../src/config"
+import { ContentFetcher } from "../src/services/content-fetcher"
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -52,34 +52,35 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       blockAds: true,
     },
     ...overrides,
-  };
+  }
 }
 
 describe("content fetcher render backend", () => {
   test("uses plain fetch when renderer backend is none", async () => {
-    let browserlessCalled = 0;
+    let browserlessCalled = 0
 
     const fetcher = new ContentFetcher(makeConfig(), {
       browserlessClient: {
         render: async () => {
-          browserlessCalled += 1;
-          return { finalUrl: "https://example.com", html: "nope" };
+          browserlessCalled += 1
+          return { finalUrl: "https://example.com", html: "nope" }
         },
       },
       assertPublicHost: async () => {},
-      fetchImpl: async () => new Response("<html>plain</html>", {
-        status: 200,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      }),
-    });
+      fetchImpl: async () =>
+        new Response("<html>plain</html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+    })
 
-    const result = await fetcher.fetchPage("https://example.com");
+    const result = await fetcher.fetchPage("https://example.com")
 
-    expect(result.backendUsed).toBe("http-fetch");
-    expect(result.rendered).toBe(false);
-    expect(result.fallbackUsed).toBe(false);
-    expect(browserlessCalled).toBe(0);
-  });
+    expect(result.backendUsed).toBe("http-fetch")
+    expect(result.rendered).toBe(false)
+    expect(result.fallbackUsed).toBe(false)
+    expect(browserlessCalled).toBe(0)
+  })
 
   test("uses browserless when enabled", async () => {
     const fetcher = new ContentFetcher(makeConfig({ websiteRendererBackend: "browserless" }), {
@@ -90,68 +91,74 @@ describe("content fetcher render backend", () => {
         }),
       },
       assertPublicHost: async () => {},
-      fetchImpl: async () => new Response("<html>plain</html>", {
-        status: 200,
-        headers: { "content-type": "text/html" },
-      }),
-    });
+      fetchImpl: async () =>
+        new Response("<html>plain</html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+    })
 
-    const result = await fetcher.fetchPage("https://example.com");
+    const result = await fetcher.fetchPage("https://example.com")
 
-    expect(result.backendUsed).toBe("browserless");
-    expect(result.rendered).toBe(true);
-    expect(result.fallbackUsed).toBe(false);
-    expect(result.body).toContain("rendered");
-  });
+    expect(result.backendUsed).toBe("browserless")
+    expect(result.rendered).toBe(true)
+    expect(result.fallbackUsed).toBe(false)
+    expect(result.body).toContain("rendered")
+  })
 
   test("falls back to plain fetch when browserless fails and fallback is enabled", async () => {
     const fetcher = new ContentFetcher(makeConfig({ websiteRendererBackend: "browserless" }), {
       browserlessClient: {
         render: async () => {
-          throw new Error("browserless offline");
+          throw new Error("browserless offline")
         },
       },
       assertPublicHost: async () => {},
-      fetchImpl: async () => new Response("<html>plain-fallback</html>", {
-        status: 200,
-        headers: { "content-type": "text/html" },
-      }),
-    });
+      fetchImpl: async () =>
+        new Response("<html>plain-fallback</html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+    })
 
-    const result = await fetcher.fetchPage("https://example.com");
+    const result = await fetcher.fetchPage("https://example.com")
 
-    expect(result.backendUsed).toBe("http-fetch");
-    expect(result.rendered).toBe(false);
-    expect(result.fallbackUsed).toBe(true);
-    expect(result.body).toContain("plain-fallback");
-  });
+    expect(result.backendUsed).toBe("http-fetch")
+    expect(result.rendered).toBe(false)
+    expect(result.fallbackUsed).toBe(true)
+    expect(result.body).toContain("plain-fallback")
+  })
 
   test("throws when browserless fails and fallback is disabled", async () => {
-    const fetcher = new ContentFetcher(makeConfig({
-      websiteRendererBackend: "browserless",
-      browserless: {
-        baseUrl: "http://browserless:3000",
-        token: "",
-        timeoutMs: 12_000,
-        waitUntil: "networkidle",
-        waitForSelector: "",
-        maxHtmlBytes: 1_500_000,
-        fallbackToHttp: false,
-        blockAds: true,
-      },
-    }), {
-      browserlessClient: {
-        render: async () => {
-          throw new Error("browserless offline");
+    const fetcher = new ContentFetcher(
+      makeConfig({
+        websiteRendererBackend: "browserless",
+        browserless: {
+          baseUrl: "http://browserless:3000",
+          token: "",
+          timeoutMs: 12_000,
+          waitUntil: "networkidle",
+          waitForSelector: "",
+          maxHtmlBytes: 1_500_000,
+          fallbackToHttp: false,
+          blockAds: true,
         },
-      },
-      assertPublicHost: async () => {},
-      fetchImpl: async () => new Response("<html>plain</html>", {
-        status: 200,
-        headers: { "content-type": "text/html" },
       }),
-    });
+      {
+        browserlessClient: {
+          render: async () => {
+            throw new Error("browserless offline")
+          },
+        },
+        assertPublicHost: async () => {},
+        fetchImpl: async () =>
+          new Response("<html>plain</html>", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+      },
+    )
 
-    await expect(fetcher.fetchPage("https://example.com")).rejects.toThrow("browserless offline");
-  });
-});
+    await expect(fetcher.fetchPage("https://example.com")).rejects.toThrow("browserless offline")
+  })
+})

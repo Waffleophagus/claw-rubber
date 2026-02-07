@@ -1,72 +1,76 @@
-import { evaluateDomainPolicy } from "../lib/domain-policy";
-import type { EvidenceMatch } from "../types.ts";
-import type { ServerContext } from "../server-context";
-import { scorePromptInjection } from "./injection-rules";
-import { decidePolicy } from "./policy";
-import { extractContent, sanitizeToText, summarizeText, type ExtractMode } from "./sanitizer";
+import { evaluateDomainPolicy } from "../lib/domain-policy"
+import type { EvidenceMatch } from "../types.ts"
+import type { ServerContext } from "../server-context"
+import { scorePromptInjection } from "./injection-rules"
+import { decidePolicy } from "./policy"
+import { extractContent, sanitizeToText, summarizeText, type ExtractMode } from "./sanitizer"
 
 interface FetchProcessingInput {
-  startedAt: number;
-  eventId: string;
-  url: string;
-  domain: string;
-  outputMode?: ExtractMode;
-  outputMaxChars?: number;
-  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
+  startedAt: number
+  eventId: string
+  url: string
+  domain: string
+  outputMode?: ExtractMode
+  outputMaxChars?: number
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown"
   searchContext?: {
-    requestId: string;
-    query: string;
-    rank: number | null;
-  };
+    requestId: string
+    query: string
+    rank: number | null
+  }
 }
 
 interface SourceMeta {
-  domain: string;
-  fetch_backend: "http-fetch" | "browserless";
-  rendered: boolean;
-  fallback_used: boolean;
-  final_url: string;
-  content_type: string;
+  domain: string
+  fetch_backend: "http-fetch" | "browserless"
+  rendered: boolean
+  fallback_used: boolean
+  final_url: string
+  content_type: string
 }
 
 export interface ProcessedFetchAllow {
-  kind: "allow";
-  content: string;
-  truncated: boolean;
-  contentSummary: string;
+  kind: "allow"
+  content: string
+  truncated: boolean
+  contentSummary: string
   safety: {
-    decision: "allow";
-    score: number;
-    flags: string[];
-    bypassed: boolean;
-    normalization_applied: string[];
-    obfuscation_signals: string[];
-  };
-  source: SourceMeta;
+    decision: "allow"
+    score: number
+    flags: string[]
+    bypassed: boolean
+    normalization_applied: string[]
+    obfuscation_signals: string[]
+  }
+  source: SourceMeta
 }
 
 export interface ProcessedFetchBlock {
-  kind: "block";
+  kind: "block"
   safety: {
-    decision: "block";
-    score: number;
-    flags: string[];
-    reason: string;
-    normalization_applied: string[];
-    obfuscation_signals: string[];
-  };
-  source?: SourceMeta;
+    decision: "block"
+    score: number
+    flags: string[]
+    reason: string
+    normalization_applied: string[]
+    obfuscation_signals: string[]
+  }
+  source?: SourceMeta
 }
 
-export type ProcessedFetch = ProcessedFetchAllow | ProcessedFetchBlock;
+export type ProcessedFetch = ProcessedFetchAllow | ProcessedFetchBlock
 
 export async function processFetchedPage(
   ctx: ServerContext,
   input: FetchProcessingInput,
 ): Promise<ProcessedFetch> {
-  const traceKind = classifyTraceKind(input.traceKind, input.searchContext);
-  const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains);
-  const domainPolicy = evaluateDomainPolicy(input.domain, effectiveAllowlist, ctx.config.blocklistDomains);
+  const traceKind = classifyTraceKind(input.traceKind, input.searchContext)
+  const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains)
+  const domainPolicy = evaluateDomainPolicy(
+    input.domain,
+    effectiveAllowlist,
+    ctx.config.blocklistDomains,
+  )
   if (domainPolicy.action === "block") {
     ctx.db.storeFetchEvent({
       resultId: input.eventId,
@@ -87,7 +91,7 @@ export async function processFetchedPage(
       searchRequestId: input.searchContext?.requestId ?? null,
       searchQuery: input.searchContext?.query ?? null,
       searchRank: input.searchContext?.rank ?? null,
-    });
+    })
 
     ctx.loggers.security.warn(
       {
@@ -96,7 +100,7 @@ export async function processFetchedPage(
         reason: domainPolicy.reason,
       },
       "blocked fetch by domain blocklist",
-    );
+    )
 
     return {
       kind: "block",
@@ -108,10 +112,10 @@ export async function processFetchedPage(
         normalization_applied: [],
         obfuscation_signals: [],
       },
-    };
+    }
   }
 
-  const fetched = await ctx.contentFetcher.fetchPage(input.url);
+  const fetched = await ctx.contentFetcher.fetchPage(input.url)
   if (fetched.fallbackUsed) {
     ctx.loggers.app.warn(
       {
@@ -121,19 +125,18 @@ export async function processFetchedPage(
         backendUsed: fetched.backendUsed,
       },
       "browserless fetch failed, used http fallback",
-    );
+    )
   }
 
-  let finalDomain = input.domain;
-  try {
-    finalDomain = new URL(fetched.finalUrl).hostname.toLowerCase();
-  } catch {
-    finalDomain = input.domain;
-  }
+  const finalDomain = safeLowercaseHostname(fetched.finalUrl, input.domain)
 
-  const finalDomainPolicy = evaluateDomainPolicy(finalDomain, effectiveAllowlist, ctx.config.blocklistDomains);
+  const finalDomainPolicy = evaluateDomainPolicy(
+    finalDomain,
+    effectiveAllowlist,
+    ctx.config.blocklistDomains,
+  )
   if (finalDomainPolicy.action === "block") {
-    const reason = `Redirected final URL blocked: ${finalDomainPolicy.reason ?? "Domain blocked"}`;
+    const reason = `Redirected final URL blocked: ${finalDomainPolicy.reason ?? "Domain blocked"}`
     ctx.db.storeFetchEvent({
       resultId: input.eventId,
       url: input.url,
@@ -153,7 +156,7 @@ export async function processFetchedPage(
       searchRequestId: input.searchContext?.requestId ?? null,
       searchQuery: input.searchContext?.query ?? null,
       searchRank: input.searchContext?.rank ?? null,
-    });
+    })
 
     ctx.loggers.security.warn(
       {
@@ -163,7 +166,7 @@ export async function processFetchedPage(
         reason,
       },
       "blocked fetch due to redirected final domain blocklist",
-    );
+    )
 
     return {
       kind: "block",
@@ -183,38 +186,38 @@ export async function processFetchedPage(
         normalization_applied: [],
         obfuscation_signals: [],
       },
-    };
+    }
   }
 
-  const scoringText = sanitizeToText(fetched.body, ctx.config.profileSettings.maxExtractedChars);
-  const extracted = extractContent(fetched.body, input.outputMode ?? "text", input.outputMaxChars);
+  const scoringText = buildScoringText(fetched.body, ctx.config.profileSettings.maxExtractedChars)
+  const extracted = extractContent(fetched.body, input.outputMode ?? "text", input.outputMaxChars)
 
-  let score = 0;
-  let flags: string[] = [];
-  let normalizationApplied: string[] = [];
-  let obfuscationSignals: string[] = [];
-  let allowSignals: string[] = [];
-  let evidence: EvidenceMatch[] = [];
+  let score = 0
+  let flags: string[] = []
+  let normalizationApplied: string[] = []
+  let obfuscationSignals: string[] = []
+  let allowSignals: string[] = []
+  let evidence: EvidenceMatch[] = []
 
   if (domainPolicy.action === "inspect") {
     const scored = scorePromptInjection(scoringText, {
       languageNameAllowlistExtra: ctx.config.languageNameAllowlistExtra,
-    });
-    score = scored.score;
-    flags = scored.flags;
-    allowSignals = scored.allowSignals ?? [];
-    normalizationApplied = scored.normalizationApplied ?? [];
-    obfuscationSignals = scored.obfuscationSignals ?? [];
-    evidence = scored.evidence ?? [];
+    })
+    score = scored.score
+    flags = scored.flags
+    allowSignals = scored.allowSignals ?? []
+    normalizationApplied = scored.normalizationApplied ?? []
+    obfuscationSignals = scored.obfuscationSignals ?? []
+    evidence = scored.evidence ?? []
   }
 
   const shouldUseJudge =
     ctx.config.llmJudgeEnabled &&
     domainPolicy.action === "inspect" &&
     score >= ctx.config.profileSettings.mediumThreshold &&
-    score < ctx.config.profileSettings.blockThreshold;
+    score < ctx.config.profileSettings.blockThreshold
 
-  const judge = shouldUseJudge ? await ctx.llmJudge.classify(scoringText, score, flags) : null;
+  const judge = shouldUseJudge ? await ctx.llmJudge.classify(scoringText, score, flags) : null
 
   const decision = decidePolicy(
     ctx.config,
@@ -223,13 +226,9 @@ export async function processFetchedPage(
     domainPolicy.action,
     domainPolicy.reason,
     judge,
-  );
+  )
 
-  const allowedBy = classifyAllowedBy(
-    decision.decision,
-    decision.bypassed ?? false,
-    allowSignals,
-  );
+  const allowedBy = classifyAllowedBy(decision.decision, decision.bypassed ?? false, allowSignals)
 
   const fetchEventId = ctx.db.storeFetchEvent({
     resultId: input.eventId,
@@ -239,7 +238,12 @@ export async function processFetchedPage(
     score: decision.score,
     flags: decision.flags,
     reason: decision.reason ?? null,
-    blockedBy: classifyBlockedBy(decision.decision, decision.reason, decision.flags, domainPolicy.action),
+    blockedBy: classifyBlockedBy(
+      decision.decision,
+      decision.reason,
+      decision.flags,
+      domainPolicy.action,
+    ),
     allowedBy,
     domainAction: domainPolicy.action,
     mediumThreshold: ctx.config.profileSettings.mediumThreshold,
@@ -250,7 +254,7 @@ export async function processFetchedPage(
     searchRequestId: input.searchContext?.requestId ?? null,
     searchQuery: input.searchContext?.query ?? null,
     searchRank: input.searchContext?.rank ?? null,
-  });
+  })
 
   if (decision.decision === "block") {
     ctx.db.storeFlaggedPayload({
@@ -263,7 +267,7 @@ export async function processFetchedPage(
       reason: decision.reason ?? "Blocked by policy",
       content: scoringText.slice(0, 30_000),
       evidence,
-    });
+    })
 
     ctx.loggers.security.warn(
       {
@@ -274,7 +278,7 @@ export async function processFetchedPage(
         reason: decision.reason,
       },
       "blocked suspicious fetch content",
-    );
+    )
 
     return {
       kind: "block",
@@ -294,7 +298,7 @@ export async function processFetchedPage(
         normalization_applied: normalizationApplied,
         obfuscation_signals: obfuscationSignals,
       },
-    };
+    }
   }
 
   if (allowedBy) {
@@ -309,7 +313,7 @@ export async function processFetchedPage(
           .map((item) => item.matchedText),
       },
       "allowed fetch due to exception pathway",
-    );
+    )
   }
 
   return {
@@ -333,7 +337,7 @@ export async function processFetchedPage(
       final_url: fetched.finalUrl,
       content_type: fetched.contentType,
     },
-  };
+  }
 }
 
 function classifyBlockedBy(
@@ -343,27 +347,30 @@ function classifyBlockedBy(
   domainAction: "allow-bypass" | "block" | "inspect",
 ): string | null {
   if (decision !== "block") {
-    return null;
+    return null
   }
 
   if (domainAction === "block" || flags.includes("domain_blocklist")) {
-    return "domain-policy";
+    return "domain-policy"
   }
 
-  const normalizedReason = (reason ?? "").toLowerCase();
+  const normalizedReason = (reason ?? "").toLowerCase()
   if (normalizedReason.startsWith("fail-closed:")) {
-    return "fail-closed";
+    return "fail-closed"
   }
 
   if (normalizedReason.startsWith("rule score")) {
-    return "rule-threshold";
+    return "rule-threshold"
   }
 
-  if (flags.some((flag) => flag.startsWith("llm_judge:")) || normalizedReason.includes("llm judge")) {
-    return "llm-judge";
+  if (
+    flags.some((flag) => flag.startsWith("llm_judge:")) ||
+    normalizedReason.includes("llm judge")
+  ) {
+    return "llm-judge"
   }
 
-  return "policy";
+  return "policy"
 }
 
 function classifyAllowedBy(
@@ -372,18 +379,18 @@ function classifyAllowedBy(
   allowSignals: string[],
 ): string | null {
   if (decision !== "allow") {
-    return null;
+    return null
   }
 
   if (bypassed) {
-    return "domain-allowlist-bypass";
+    return "domain-allowlist-bypass"
   }
 
   if (allowSignals.includes("language_exception")) {
-    return "language-exception";
+    return "language-exception"
   }
 
-  return null;
+  return null
 }
 
 function classifyTraceKind(
@@ -391,12 +398,50 @@ function classifyTraceKind(
   searchContext: FetchProcessingInput["searchContext"] | undefined,
 ): "search-result-fetch" | "direct-web-fetch" | "unknown" {
   if (traceKind && traceKind !== "unknown") {
-    return traceKind;
+    return traceKind
   }
 
   if (searchContext) {
-    return "search-result-fetch";
+    return "search-result-fetch"
   }
 
-  return traceKind ?? "unknown";
+  return traceKind ?? "unknown"
+}
+
+function buildScoringText(rawBody: string, maxExtractedChars: number): string {
+  const sanitized = sanitizeToText(rawBody, maxExtractedChars)
+  const comments = extractHtmlComments(rawBody, Math.max(2_000, maxExtractedChars))
+  if (comments.length === 0) {
+    return sanitized
+  }
+
+  return `${sanitized}\n${comments.join("\n")}`.slice(0, maxExtractedChars * 2)
+}
+
+function extractHtmlComments(rawBody: string, maxChars: number): string[] {
+  const limited = rawBody.slice(0, maxChars)
+  const matches = limited.matchAll(/<!--([\s\S]*?)-->/g)
+  const extracted: string[] = []
+
+  for (const match of matches) {
+    const text = match[1]?.replace(/\s+/g, " ").trim()
+    if (!text || text.length < 12) {
+      continue
+    }
+
+    extracted.push(text.slice(0, 600))
+    if (extracted.length >= 6) {
+      break
+    }
+  }
+
+  return extracted
+}
+
+function safeLowercaseHostname(url: string, fallback: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase()
+  } catch {
+    return fallback
+  }
 }

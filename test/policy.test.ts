@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
-import type { AppConfig } from "../src/config";
-import { decidePolicy } from "../src/services/policy";
+import { describe, expect, test } from "bun:test"
+import type { AppConfig } from "../src/config"
+import { decidePolicy } from "../src/services/policy"
 
 function mockConfig(): AppConfig {
   return {
@@ -51,33 +51,40 @@ function mockConfig(): AppConfig {
       fallbackToHttp: true,
       blockAds: true,
     },
-  };
+  }
 }
 
 describe("policy decisions", () => {
   test("block on blocklist", () => {
-    const decision = decidePolicy(mockConfig(), 0, [], "block", "blocked domain", null);
+    const decision = decidePolicy(mockConfig(), 0, [], "block", "blocked domain", null)
 
-    expect(decision.decision).toBe("block");
-    expect(decision.reason).toContain("blocked domain");
-  });
+    expect(decision.decision).toBe("block")
+    expect(decision.reason).toContain("blocked domain")
+  })
 
   test("allow on allowlist bypass", () => {
-    const decision = decidePolicy(mockConfig(), 99, ["instruction_override"], "allow-bypass", "trusted domain", null);
+    const decision = decidePolicy(
+      mockConfig(),
+      99,
+      ["instruction_override"],
+      "allow-bypass",
+      "trusted domain",
+      null,
+    )
 
-    expect(decision.decision).toBe("allow");
-    expect(decision.bypassed).toBe(true);
-  });
+    expect(decision.decision).toBe("allow")
+    expect(decision.bypassed).toBe(true)
+  })
 
   test("fail-closed blocks medium score", () => {
-    const decision = decidePolicy(mockConfig(), 6, ["tool_abuse"], "inspect", undefined, null);
+    const decision = decidePolicy(mockConfig(), 6, ["tool_abuse"], "inspect", undefined, null)
 
-    expect(decision.decision).toBe("block");
-  });
+    expect(decision.decision).toBe("block")
+  })
 
   test("allows low score", () => {
-    const decision = decidePolicy(mockConfig(), 2, [], "inspect", undefined, null);
+    const decision = decidePolicy(mockConfig(), 2, [], "inspect", undefined, null)
 
-    expect(decision.decision).toBe("allow");
-  });
-});
+    expect(decision.decision).toBe("allow")
+  })
+})

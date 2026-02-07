@@ -1,25 +1,25 @@
-import { describe, expect, test } from "bun:test";
-import { rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { Database } from "bun:sqlite";
-import { AppDb } from "../src/db";
+import { describe, expect, test } from "bun:test"
+import { rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { Database } from "bun:sqlite"
+import { AppDb } from "../src/db"
 
 function createDbPath(): string {
-  return join(tmpdir(), `claw-rubber-dashboard-${crypto.randomUUID()}.db`);
+  return join(tmpdir(), `claw-rubber-dashboard-${crypto.randomUUID()}.db`)
 }
 
 function createDb(): { db: AppDb; path: string } {
-  const path = createDbPath();
+  const path = createDbPath()
   return {
     db: new AppDb(path),
     path,
-  };
+  }
 }
 
 function cleanupDb(path: string): void {
   try {
-    rmSync(path, { force: true });
+    rmSync(path, { force: true })
   } catch {
     // no-op
   }
@@ -27,11 +27,11 @@ function cleanupDb(path: string): void {
 
 describe("dashboard db", () => {
   test("migrates legacy flagged_payloads schema before creating fetch_event_id index", () => {
-    const path = createDbPath();
-    let legacyDb: Database | null = null;
+    const path = createDbPath()
+    let legacyDb: Database | null = null
 
     try {
-      legacyDb = new Database(path, { create: true, strict: true });
+      legacyDb = new Database(path, { create: true, strict: true })
       legacyDb.exec(`
         CREATE TABLE fetch_events (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,22 +59,30 @@ describe("dashboard db", () => {
         );
 
         CREATE INDEX idx_flagged_payloads_result_id ON flagged_payloads(result_id);
-      `);
-      legacyDb.close();
-      legacyDb = null;
+      `)
+      legacyDb.close()
+      legacyDb = null
 
       // Should not throw on migration from older schema.
-      const db = new AppDb(path);
+      const db = new AppDb(path)
 
-      const verifyDb = new Database(path, { strict: true });
-      const fetchColumns = verifyDb.prepare(`PRAGMA table_info(fetch_events)`).all() as Array<{ name: string }>;
-      const columns = verifyDb.prepare(`PRAGMA table_info(flagged_payloads)`).all() as Array<{ name: string }>;
-      const indexRows = verifyDb.prepare(`PRAGMA index_list(flagged_payloads)`).all() as Array<{ name: string }>;
+      const verifyDb = new Database(path, { strict: true })
+      const fetchColumns = verifyDb.prepare(`PRAGMA table_info(fetch_events)`).all() as Array<{
+        name: string
+      }>
+      const columns = verifyDb.prepare(`PRAGMA table_info(flagged_payloads)`).all() as Array<{
+        name: string
+      }>
+      const indexRows = verifyDb.prepare(`PRAGMA index_list(flagged_payloads)`).all() as Array<{
+        name: string
+      }>
 
-      expect(fetchColumns.some((column) => column.name === "allowed_by")).toBe(true);
-      expect(columns.some((column) => column.name === "fetch_event_id")).toBe(true);
-      expect(columns.some((column) => column.name === "evidence_json")).toBe(true);
-      expect(indexRows.some((index) => index.name === "idx_flagged_payloads_fetch_event_id")).toBe(true);
+      expect(fetchColumns.some((column) => column.name === "allowed_by")).toBe(true)
+      expect(columns.some((column) => column.name === "fetch_event_id")).toBe(true)
+      expect(columns.some((column) => column.name === "evidence_json")).toBe(true)
+      expect(indexRows.some((index) => index.name === "idx_flagged_payloads_fetch_event_id")).toBe(
+        true,
+      )
 
       const eventId = db.storeFetchEvent({
         resultId: "legacy-result",
@@ -91,7 +99,7 @@ describe("dashboard db", () => {
         blockThreshold: 10,
         bypassed: false,
         durationMs: 30,
-      });
+      })
 
       db.storeFlaggedPayload({
         fetchEventId: eventId,
@@ -115,42 +123,42 @@ describe("dashboard db", () => {
         ],
         reason: "legacy migration test",
         content: "legacy payload",
-      });
+      })
 
-      const detail = db.getDashboardEventDetail(`fetch:${eventId}`);
-      expect(detail?.payloadContent).toContain("legacy payload");
-      expect(detail?.evidence[0]?.flag).toBe("legacy_rule");
+      const detail = db.getDashboardEventDetail(`fetch:${eventId}`)
+      expect(detail?.payloadContent).toContain("legacy payload")
+      expect(detail?.evidence[0]?.flag).toBe("legacy_rule")
 
-      verifyDb.close();
+      verifyDb.close()
     } finally {
-      legacyDb?.close();
-      cleanupDb(path);
+      legacyDb?.close()
+      cleanupDb(path)
     }
-  });
+  })
 
   test("runtime allowlist merges with static allowlist", () => {
-    const { db, path } = createDb();
+    const { db, path } = createDb()
     try {
-      db.addRuntimeAllowlistDomain("*.docs.bun.sh", "investigator override");
-      db.addRuntimeAllowlistDomain("api.example.com");
-      expect(() => db.addRuntimeAllowlistDomain("$$$")).toThrow("Invalid domain");
+      db.addRuntimeAllowlistDomain("*.docs.bun.sh", "investigator override")
+      db.addRuntimeAllowlistDomain("api.example.com")
+      expect(() => db.addRuntimeAllowlistDomain("$$$")).toThrow("Invalid domain")
 
-      const runtime = db.listRuntimeAllowlistDomains();
-      expect(runtime.length).toBe(2);
-      expect(runtime[0]?.domain).toBe("api.example.com");
-      expect(runtime[1]?.domain).toBe("docs.bun.sh");
+      const runtime = db.listRuntimeAllowlistDomains()
+      expect(runtime.length).toBe(2)
+      expect(runtime[0]?.domain).toBe("api.example.com")
+      expect(runtime[1]?.domain).toBe("docs.bun.sh")
 
-      const effective = db.getEffectiveAllowlist(["example.org", "docs.bun.sh"]);
-      expect(effective.includes("example.org")).toBe(true);
-      expect(effective.includes("docs.bun.sh")).toBe(true);
-      expect(effective.includes("api.example.com")).toBe(true);
+      const effective = db.getEffectiveAllowlist(["example.org", "docs.bun.sh"])
+      expect(effective.includes("example.org")).toBe(true)
+      expect(effective.includes("docs.bun.sh")).toBe(true)
+      expect(effective.includes("api.example.com")).toBe(true)
     } finally {
-      cleanupDb(path);
+      cleanupDb(path)
     }
-  });
+  })
 
   test("fetch event detail returns payload and triage metadata", () => {
-    const { db, path } = createDb();
+    const { db, path } = createDb()
     try {
       const fetchEventId = db.storeFetchEvent({
         resultId: "result-1",
@@ -167,7 +175,7 @@ describe("dashboard db", () => {
         blockThreshold: 10,
         bypassed: false,
         durationMs: 120,
-      });
+      })
 
       db.storeFlaggedPayload({
         fetchEventId,
@@ -192,25 +200,25 @@ describe("dashboard db", () => {
         ],
         reason: "Rule score 13 >= block threshold 10",
         content: "malicious block payload",
-      });
+      })
 
-      const detail = db.getDashboardEventDetail(`fetch:${fetchEventId}`);
-      expect(detail).toBeDefined();
-      expect(detail?.blockedBy).toBe("rule-threshold");
-      expect(detail?.score).toBe(13);
-      expect(detail?.blockThreshold).toBe(10);
-      expect(detail?.payloadContent).toContain("malicious block payload");
-      expect(detail?.evidence.length).toBe(1);
-      expect(detail?.evidence[0]?.flag).toBe("instruction_override");
+      const detail = db.getDashboardEventDetail(`fetch:${fetchEventId}`)
+      expect(detail).toBeDefined()
+      expect(detail?.blockedBy).toBe("rule-threshold")
+      expect(detail?.score).toBe(13)
+      expect(detail?.blockThreshold).toBe(10)
+      expect(detail?.payloadContent).toContain("malicious block payload")
+      expect(detail?.evidence.length).toBe(1)
+      expect(detail?.evidence[0]?.flag).toBe("instruction_override")
     } finally {
-      cleanupDb(path);
+      cleanupDb(path)
     }
-  });
+  })
 
   test("dashboard events combine fetch and search sources with filters", () => {
-    const { db, path } = createDb();
+    const { db, path } = createDb()
     try {
-      const now = Date.now();
+      const now = Date.now()
       db.storeSearchResult({
         resultId: "result-fetch-1",
         requestId: "req-search-1",
@@ -225,7 +233,7 @@ describe("dashboard db", () => {
         blockReason: null,
         createdAt: now,
         expiresAt: now + 60_000,
-      });
+      })
 
       db.storeSearchBlockEvent({
         requestId: "req-1",
@@ -236,7 +244,7 @@ describe("dashboard db", () => {
         title: "Blocked Domain Result",
         source: "brave",
         reason: "Domain matched blocklist rule: blocked.example",
-      });
+      })
 
       db.storeFetchEvent({
         resultId: "result-fetch-1",
@@ -253,7 +261,7 @@ describe("dashboard db", () => {
         blockThreshold: 10,
         bypassed: false,
         durationMs: 44,
-      });
+      })
 
       db.storeFetchEvent({
         resultId: "result-fetch-2",
@@ -271,7 +279,7 @@ describe("dashboard db", () => {
         bypassed: false,
         durationMs: 80,
         traceKind: "direct-web-fetch",
-      });
+      })
 
       const baseQuery = {
         from: now - 60_000,
@@ -280,58 +288,58 @@ describe("dashboard db", () => {
         decision: "block" as const,
         offset: 0,
         limit: 100,
-      };
+      }
 
-      const blockedOnly = db.getDashboardEvents(baseQuery);
-      expect(blockedOnly.total).toBe(2);
-      expect(blockedOnly.events.some((event) => event.source === "search")).toBe(true);
-      expect(blockedOnly.events.some((event) => event.blockedBy === "fail-closed")).toBe(true);
+      const blockedOnly = db.getDashboardEvents(baseQuery)
+      expect(blockedOnly.total).toBe(2)
+      expect(blockedOnly.events.some((event) => event.source === "search")).toBe(true)
+      expect(blockedOnly.events.some((event) => event.blockedBy === "fail-closed")).toBe(true)
 
       const flagged = db.getDashboardEvents({
         ...baseQuery,
         flagContains: "llm_judge",
-      });
-      expect(flagged.total).toBe(1);
-      expect(flagged.events[0]?.domain).toBe("bad.example");
+      })
+      expect(flagged.total).toBe(1)
+      expect(flagged.events[0]?.domain).toBe("bad.example")
 
       const allowedByLanguage = db.getDashboardEvents({
         ...baseQuery,
         decision: "allow",
         allowedByContains: "language",
-      });
-      expect(allowedByLanguage.total).toBe(1);
-      expect(allowedByLanguage.events[0]?.allowedBy).toBe("language-exception");
-      expect(allowedByLanguage.events[0]?.traceKind).toBe("search-result-fetch");
-      expect(allowedByLanguage.events[0]?.searchRank).toBe(2);
-      expect(allowedByLanguage.events[0]?.query).toBe("victorian architecture");
+      })
+      expect(allowedByLanguage.total).toBe(1)
+      expect(allowedByLanguage.events[0]?.allowedBy).toBe("language-exception")
+      expect(allowedByLanguage.events[0]?.traceKind).toBe("search-result-fetch")
+      expect(allowedByLanguage.events[0]?.searchRank).toBe(2)
+      expect(allowedByLanguage.events[0]?.query).toBe("victorian architecture")
 
       const directWebFetchOnly = db.getDashboardEvents({
         ...baseQuery,
         decision: "block",
         source: "fetch",
         traceKind: "direct-web-fetch",
-      });
-      expect(directWebFetchOnly.total).toBe(1);
-      expect(directWebFetchOnly.events[0]?.domain).toBe("bad.example");
+      })
+      expect(directWebFetchOnly.total).toBe(1)
+      expect(directWebFetchOnly.events[0]?.domain).toBe("bad.example")
 
       const rankFiltered = db.getDashboardEvents({
         ...baseQuery,
         decision: "allow",
         minSearchRank: 2,
         maxSearchRank: 2,
-      });
-      expect(rankFiltered.total).toBe(1);
-      expect(rankFiltered.events[0]?.domain).toBe("review.example");
+      })
+      expect(rankFiltered.total).toBe(1)
+      expect(rankFiltered.events[0]?.domain).toBe("review.example")
 
       const overview = db.getDashboardOverview({
         from: now - 60_000,
         to: now + 60_000,
         source: "all",
         decision: "all",
-      });
-      expect(overview.topAllowedBy).toBe("language-exception");
+      })
+      expect(overview.topAllowedBy).toBe("language-exception")
     } finally {
-      cleanupDb(path);
+      cleanupDb(path)
     }
-  });
-});
+  })
+})

@@ -1,10 +1,10 @@
-import { describe, expect, test } from "bun:test";
-import type { AppConfig } from "../src/config";
-import { handleFetch } from "../src/routes/fetch";
-import { handleWebFetch } from "../src/routes/web-fetch";
-import type { ServerContext } from "../src/server-context";
+import { describe, expect, test } from "bun:test"
+import type { AppConfig } from "../src/config"
+import { handleFetch } from "../src/routes/fetch"
+import { handleWebFetch } from "../src/routes/web-fetch"
+import type { ServerContext } from "../src/server-context"
 
-const RESULT_ID = "11111111-1111-4111-8111-111111111111";
+const RESULT_ID = "11111111-1111-4111-8111-111111111111"
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -56,7 +56,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       blockAds: true,
     },
     ...overrides,
-  };
+  }
 }
 
 function makeContext({
@@ -64,11 +64,11 @@ function makeContext({
   searchRecordUrl = "https://example.com/path",
   fetchFinalUrl,
 }: {
-  config: AppConfig;
-  searchRecordUrl?: string;
-  fetchFinalUrl?: string;
+  config: AppConfig
+  searchRecordUrl?: string
+  fetchFinalUrl?: string
 }): ServerContext {
-  const recordUrl = new URL(searchRecordUrl);
+  const recordUrl = new URL(searchRecordUrl)
 
   return {
     config,
@@ -106,7 +106,7 @@ function makeContext({
     },
     braveClient: {
       webSearch: async () => {
-        throw new Error("not used");
+        throw new Error("not used")
       },
     },
     contentFetcher: {
@@ -122,12 +122,12 @@ function makeContext({
     llmJudge: {
       classify: async () => ({ label: "benign" as const, confidence: 1, reasons: [] }),
     },
-  } as unknown as ServerContext;
+  } as unknown as ServerContext
 }
 
 describe("URL exposure on content responses", () => {
   test("/v1/fetch includes url/final_url when exposure is enabled", async () => {
-    const ctx = makeContext({ config: makeConfig({ exposeSafeContentUrls: true }) });
+    const ctx = makeContext({ config: makeConfig({ exposeSafeContentUrls: true }) })
 
     const response = await handleFetch(
       new Request("http://localhost/v1/fetch", {
@@ -136,16 +136,16 @@ describe("URL exposure on content responses", () => {
         body: JSON.stringify({ result_id: RESULT_ID }),
       }),
       ctx,
-    );
+    )
 
-    expect(response.status).toBe(200);
-    const payload = await response.json() as { url?: string; final_url?: string };
-    expect(payload.url).toBe("https://example.com/path");
-    expect(payload.final_url).toBe("https://example.com/path");
-  });
+    expect(response.status).toBe(200)
+    const payload = (await response.json()) as { url?: string; final_url?: string }
+    expect(payload.url).toBe("https://example.com/path")
+    expect(payload.final_url).toBe("https://example.com/path")
+  })
 
   test("/v1/fetch omits url/final_url when exposure is disabled", async () => {
-    const ctx = makeContext({ config: makeConfig({ exposeSafeContentUrls: false }) });
+    const ctx = makeContext({ config: makeConfig({ exposeSafeContentUrls: false }) })
 
     const response = await handleFetch(
       new Request("http://localhost/v1/fetch", {
@@ -154,13 +154,13 @@ describe("URL exposure on content responses", () => {
         body: JSON.stringify({ result_id: RESULT_ID }),
       }),
       ctx,
-    );
+    )
 
-    expect(response.status).toBe(200);
-    const payload = await response.json() as { url?: string; final_url?: string };
-    expect(payload.url).toBeUndefined();
-    expect(payload.final_url).toBeUndefined();
-  });
+    expect(response.status).toBe(200)
+    const payload = (await response.json()) as { url?: string; final_url?: string }
+    expect(payload.url).toBeUndefined()
+    expect(payload.final_url).toBeUndefined()
+  })
 
   test("/v1/web-fetch blocked response omits top-level URL fields", async () => {
     const ctx = makeContext({
@@ -168,7 +168,7 @@ describe("URL exposure on content responses", () => {
         blocklistDomains: ["example.com"],
         exposeSafeContentUrls: true,
       }),
-    });
+    })
 
     const response = await handleWebFetch(
       new Request("http://localhost/v1/web-fetch", {
@@ -177,13 +177,13 @@ describe("URL exposure on content responses", () => {
         body: JSON.stringify({ url: "https://example.com/path", extractMode: "text" }),
       }),
       ctx,
-    );
+    )
 
-    expect(response.status).toBe(422);
-    const payload = await response.json() as { url?: string; final_url?: string };
-    expect(payload.url).toBeUndefined();
-    expect(payload.final_url).toBeUndefined();
-  });
+    expect(response.status).toBe(422)
+    const payload = (await response.json()) as { url?: string; final_url?: string }
+    expect(payload.url).toBeUndefined()
+    expect(payload.final_url).toBeUndefined()
+  })
 
   test("redirect to blocklisted final URL returns 422", async () => {
     const ctx = makeContext({
@@ -193,7 +193,7 @@ describe("URL exposure on content responses", () => {
       }),
       searchRecordUrl: "https://safe.example/article",
       fetchFinalUrl: "https://evil.example/payload",
-    });
+    })
 
     const response = await handleFetch(
       new Request("http://localhost/v1/fetch", {
@@ -202,17 +202,17 @@ describe("URL exposure on content responses", () => {
         body: JSON.stringify({ result_id: RESULT_ID }),
       }),
       ctx,
-    );
+    )
 
-    expect(response.status).toBe(422);
-    const payload = await response.json() as {
-      url?: string;
-      final_url?: string;
-      safety?: { reason?: string; decision?: string };
-    };
-    expect(payload.url).toBeUndefined();
-    expect(payload.final_url).toBeUndefined();
-    expect(payload.safety?.decision).toBe("block");
-    expect(payload.safety?.reason).toContain("Redirected final URL blocked");
-  });
-});
+    expect(response.status).toBe(422)
+    const payload = (await response.json()) as {
+      url?: string
+      final_url?: string
+      safety?: { reason?: string; decision?: string }
+    }
+    expect(payload.url).toBeUndefined()
+    expect(payload.final_url).toBeUndefined()
+    expect(payload.safety?.decision).toBe("block")
+    expect(payload.safety?.reason).toContain("Redirected final URL blocked")
+  })
+})

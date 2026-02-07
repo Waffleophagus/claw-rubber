@@ -104,7 +104,10 @@
 }
 
 .trace-dashboard-v1 .trace-metric-card {
-  transition: transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease;
+  transition:
+    transform 170ms ease,
+    box-shadow 170ms ease,
+    border-color 170ms ease;
   padding: 0.88rem 0.85rem;
 }
 

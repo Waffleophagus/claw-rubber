@@ -1,18 +1,18 @@
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import pino from "pino";
-import { createStream } from "rotating-file-stream";
-import type { AppConfig } from "./config";
+import { mkdirSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import pino from "pino"
+import { createStream } from "rotating-file-stream"
+import type { AppConfig } from "./config"
 
 export interface Loggers {
-  app: pino.Logger;
-  security: pino.Logger;
+  app: pino.Logger
+  security: pino.Logger
 }
 
 export function createLoggers(config: AppConfig): Loggers {
-  const resolvedLogDir = resolve(config.logDir);
-  mkdirSync(resolvedLogDir, { recursive: true });
-  mkdirSync(dirname(config.dbPath), { recursive: true });
+  const resolvedLogDir = resolve(config.logDir)
+  mkdirSync(resolvedLogDir, { recursive: true })
+  mkdirSync(dirname(config.dbPath), { recursive: true })
 
   const appStream = createStream("app.log", {
     interval: "1d",
@@ -20,7 +20,7 @@ export function createLoggers(config: AppConfig): Loggers {
     rotate: 30,
     path: resolvedLogDir,
     compress: "gzip",
-  });
+  })
 
   const securityStream = createStream("security.log", {
     interval: "1d",
@@ -28,7 +28,7 @@ export function createLoggers(config: AppConfig): Loggers {
     rotate: 60,
     path: resolvedLogDir,
     compress: "gzip",
-  });
+  })
 
   const app = pino(
     {
@@ -40,7 +40,7 @@ export function createLoggers(config: AppConfig): Loggers {
       timestamp: pino.stdTimeFunctions.isoTime,
     },
     appStream,
-  );
+  )
 
   const security = pino(
     {
@@ -52,7 +52,7 @@ export function createLoggers(config: AppConfig): Loggers {
       timestamp: pino.stdTimeFunctions.isoTime,
     },
     securityStream,
-  );
+  )
 
-  return { app, security };
+  return { app, security }
 }
