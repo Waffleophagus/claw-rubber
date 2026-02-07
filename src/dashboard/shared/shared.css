@@ -631,12 +631,15 @@ body {
 .trace-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border-radius: 999px;
   font-size: 0.67rem;
   padding: 0.2rem 0.45rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .trace-pill.success {
