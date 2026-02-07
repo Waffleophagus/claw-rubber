@@ -157,6 +157,9 @@ loggers.app.info(
     allowlistSize: config.allowlistDomains.length,
     blocklistSize: config.blocklistDomains.length,
     websiteRendererBackend: config.websiteRendererBackend,
+    braveRateLimitTier: config.braveRateLimit.tier,
+    braveRateLimitRps: config.braveRateLimit.requestsPerSecond,
+    braveQueueMax: config.braveRateLimit.queueMax,
   },
   "claw-rubber started",
 );

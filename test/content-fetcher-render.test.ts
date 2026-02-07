@@ -8,6 +8,13 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     host: "0.0.0.0",
     braveApiKey: "x",
     braveApiBaseUrl: "https://api.search.brave.com/res/v1",
+    braveRateLimit: {
+      tier: "free",
+      requestsPerSecond: 1,
+      queueMax: 10,
+      retryOn429: true,
+      retryMax: 1,
+    },
     profile: "strict",
     profileSettings: {
       mediumThreshold: 6,

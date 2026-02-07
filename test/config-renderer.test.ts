@@ -7,6 +7,11 @@ test("uses none renderer backend by default", () => {
   expect(config.websiteRendererBackend).toBe("none");
   expect(config.browserless.baseUrl).toBe("http://browserless:3000");
   expect(config.browserless.fallbackToHttp).toBe(true);
+  expect(config.braveRateLimit.tier).toBe("free");
+  expect(config.braveRateLimit.requestsPerSecond).toBe(1);
+  expect(config.braveRateLimit.queueMax).toBe(10);
+  expect(config.braveRateLimit.retryOn429).toBe(true);
+  expect(config.braveRateLimit.retryMax).toBe(1);
 });
 
 test("parses CLAWRUBBER renderer settings", () => {
@@ -31,4 +36,38 @@ test("parses CLAWRUBBER renderer settings", () => {
   expect(config.browserless.maxHtmlBytes).toBe(420000);
   expect(config.browserless.fallbackToHttp).toBe(false);
   expect(config.browserless.blockAds).toBe(false);
+});
+
+test("parses brave rate limit tier and queue settings", () => {
+  const config = loadConfig({
+    CLAWRUBBER_RATE_LIMIT: "pro",
+    CLAWRUBBER_BRAVE_QUEUE_MAX: "25",
+    CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429: "false",
+    CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX: "3",
+  });
+
+  expect(config.braveRateLimit.tier).toBe("pro");
+  expect(config.braveRateLimit.requestsPerSecond).toBe(50);
+  expect(config.braveRateLimit.queueMax).toBe(25);
+  expect(config.braveRateLimit.retryOn429).toBe(false);
+  expect(config.braveRateLimit.retryMax).toBe(3);
+});
+
+test("uses explicit brave rate limit rps override and clamps invalid minimums", () => {
+  const config = loadConfig({
+    CLAWRUBBER_RATE_LIMIT: "7",
+    CLAWRUBBER_BRAVE_QUEUE_MAX: "0",
+    CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX: "-9",
+  });
+
+  expect(config.braveRateLimit.tier).toBe("custom");
+  expect(config.braveRateLimit.requestsPerSecond).toBe(7);
+  expect(config.braveRateLimit.queueMax).toBe(1);
+  expect(config.braveRateLimit.retryMax).toBe(0);
+});
+
+test("throws when CLAWRUBBER_RATE_LIMIT is invalid", () => {
+  expect(() => loadConfig({
+    CLAWRUBBER_RATE_LIMIT: "not-a-valid-rate-limit",
+  })).toThrow();
 });

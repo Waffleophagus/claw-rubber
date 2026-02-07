@@ -29,6 +29,8 @@ export CLAWRUBBER_PROFILE="strict"
 export CLAWRUBBER_ALLOWLIST_DOMAINS="docs.bun.sh"
 export CLAWRUBBER_BLOCKLIST_DOMAINS="evil.example"
 export CLAWRUBBER_WEBSITE_RENDERER_BACKEND="none"
+export CLAWRUBBER_RATE_LIMIT="free"
+export CLAWRUBBER_BRAVE_QUEUE_MAX="10"
 ```
 
 3. Run server:
@@ -91,6 +93,16 @@ Notes:
 ## URL Exposure
 Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to include URLs in `/v1/search` responses.
 
+## Brave Rate Limiting
+Brave requests are rate-limited through an internal queue to avoid 429s under burst traffic.
+
+- `CLAWRUBBER_RATE_LIMIT` accepts either a tier name or a positive integer:
+  - Tier presets: `free=1 rps`, `paid=20 rps`, `base=20 rps`, `pro=50 rps`
+  - Numeric override examples: `1`, `20`, `50`, `75`
+- Queue capacity is configurable with `CLAWRUBBER_BRAVE_QUEUE_MAX` (default `10`).
+- When queue is full, `/v1/search` returns `503`.
+- On Brave `429`, the client retries by default using `retry-after`/`x-ratelimit-reset` headers.
+
 ## Domain Policy
 - Blocklist wins over allowlist.
 - Allowlisted domains bypass prompt-injection filtering.
@@ -104,6 +116,10 @@ Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to inclu
 
 ## Environment Variables
 - `CLAWRUBBER_BRAVE_API_KEY`
+- `CLAWRUBBER_RATE_LIMIT` (`free|paid|base|pro` or positive integer, default `free`)
+- `CLAWRUBBER_BRAVE_QUEUE_MAX` (default `10`)
+- `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429=true|false` (default `true`)
+- `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX` (default `1`)
 - `CLAWRUBBER_PROFILE=baseline|strict|paranoid`
 - `CLAWRUBBER_REDACT_URLS=true|false`
 - `CLAWRUBBER_FAIL_CLOSED=true|false`

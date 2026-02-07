@@ -2,6 +2,7 @@ import { z } from "zod";
 import { evaluateDomainPolicy } from "../lib/domain-policy";
 import { errorResponse, jsonResponse, readJsonBody } from "../lib/http";
 import type { ServerContext } from "../server-context";
+import { QueueOverflowError } from "../services/rate-limiter";
 import type { SearchResultRecord, SearchResultResponse } from "../types";
 
 const SearchRequestSchema = z.object({
@@ -117,6 +118,9 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
     });
   } catch (error) {
     ctx.loggers.app.error({ error, requestId }, "search request failed");
+    if (error instanceof QueueOverflowError) {
+      return errorResponse(503, "Search queue is full, retry shortly");
+    }
     return errorResponse(502, "Failed to query Brave API");
   }
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 export type ProfileName = "baseline" | "strict" | "paranoid";
 export type WebsiteRendererBackend = "none" | "browserless";
 export type BrowserlessWaitUntil = "domcontentloaded" | "load" | "networkidle";
+export type BraveRateLimitTier = "free" | "paid" | "base" | "pro";
 
 export interface ProfileSettings {
   mediumThreshold: number;
@@ -24,11 +25,20 @@ export interface BrowserlessSettings {
   blockAds: boolean;
 }
 
+export interface BraveRateLimitSettings {
+  tier: BraveRateLimitTier | "custom";
+  requestsPerSecond: number;
+  queueMax: number;
+  retryOn429: boolean;
+  retryMax: number;
+}
+
 export interface AppConfig {
   port: number;
   host: string;
   braveApiKey: string;
   braveApiBaseUrl: string;
+  braveRateLimit: BraveRateLimitSettings;
   profile: ProfileName;
   profileSettings: ProfileSettings;
   redactedUrls: boolean;
@@ -76,11 +86,39 @@ const profiles: Record<ProfileName, ProfileSettings> = {
   },
 };
 
+const braveTierRps: Record<BraveRateLimitTier, number> = {
+  free: 1,
+  paid: 20,
+  base: 20,
+  pro: 50,
+};
+
+const RateLimitTierSchema = z.enum(["free", "paid", "base", "pro"]);
+const RateLimitSettingSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (/^\d+$/.test(normalized)) {
+      return Number.parseInt(normalized, 10);
+    }
+
+    return normalized;
+  },
+  z.union([RateLimitTierSchema, z.number().int().positive()]),
+);
+
 const EnvSchema = z.object({
   PORT: z.string().optional(),
   HOST: z.string().optional(),
   CLAWRUBBER_BRAVE_API_KEY: z.string().default(""),
   CLAWRUBBER_BRAVE_API_BASE_URL: z.string().default("https://api.search.brave.com/res/v1"),
+  CLAWRUBBER_RATE_LIMIT: RateLimitSettingSchema.default("free"),
+  CLAWRUBBER_BRAVE_QUEUE_MAX: z.string().optional(),
+  CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429: z.string().optional(),
+  CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX: z.string().optional(),
   CLAWRUBBER_PROFILE: z.enum(["baseline", "strict", "paranoid"]).default("strict"),
   CLAWRUBBER_REDACT_URLS: z.string().optional(),
   CLAWRUBBER_FAIL_CLOSED: z.string().optional(),
@@ -137,6 +175,11 @@ function toInteger(input: string | undefined, defaultValue: number): number {
   return parsed;
 }
 
+function toMinInteger(input: string | undefined, defaultValue: number, min: number): number {
+  const parsed = toInteger(input, defaultValue);
+  return parsed < min ? min : parsed;
+}
+
 function parseDomainList(input: string | undefined): string[] {
   if (!input) {
     return [];
@@ -154,12 +197,28 @@ export function loadConfig(env = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
   const profileSettings = profiles[parsed.CLAWRUBBER_PROFILE];
   const maxHtmlBytes = toInteger(parsed.CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES, 1_500_000);
+  const braveRateLimit = typeof parsed.CLAWRUBBER_RATE_LIMIT === "number"
+    ? {
+        tier: "custom" as const,
+        requestsPerSecond: parsed.CLAWRUBBER_RATE_LIMIT,
+      }
+    : {
+        tier: parsed.CLAWRUBBER_RATE_LIMIT as BraveRateLimitTier,
+        requestsPerSecond: braveTierRps[parsed.CLAWRUBBER_RATE_LIMIT as BraveRateLimitTier],
+      };
 
   return {
     port: toInteger(parsed.PORT, 3000),
     host: parsed.HOST ?? "0.0.0.0",
     braveApiKey: parsed.CLAWRUBBER_BRAVE_API_KEY,
     braveApiBaseUrl: parsed.CLAWRUBBER_BRAVE_API_BASE_URL,
+    braveRateLimit: {
+      tier: braveRateLimit.tier,
+      requestsPerSecond: braveRateLimit.requestsPerSecond,
+      queueMax: toMinInteger(parsed.CLAWRUBBER_BRAVE_QUEUE_MAX, 10, 1),
+      retryOn429: toBoolean(parsed.CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429, true),
+      retryMax: toMinInteger(parsed.CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX, 1, 0),
+    },
     profile: parsed.CLAWRUBBER_PROFILE,
     profileSettings,
     redactedUrls: toBoolean(parsed.CLAWRUBBER_REDACT_URLS, true),
