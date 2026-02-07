@@ -1,0 +1,239 @@
+@import "../shared/shared.css";
+
+.trace-dashboard-v1 {
+  --trace-font-sans: "Space Grotesk", sans-serif;
+  --trace-font-mono: "IBM Plex Mono", monospace;
+  --trace-bg:
+    radial-gradient(1100px 480px at 6% -10%, rgba(14, 116, 144, 0.25), transparent 58%),
+    radial-gradient(900px 420px at 95% 0%, rgba(225, 29, 72, 0.12), transparent 52%),
+    linear-gradient(160deg, #ecf4ff, #f7fbff 40%, #eff9f8);
+  --trace-panel: rgba(255, 255, 255, 0.82);
+  --trace-panel-strong: #ffffff;
+  --trace-border: #bfdbfe;
+  --trace-shadow: 0 24px 45px rgba(15, 23, 42, 0.1);
+  --trace-ink: #102338;
+  --trace-muted: #40617f;
+  --trace-accent: #0f766e;
+  --trace-danger: #be123c;
+  position: relative;
+}
+
+.trace-dashboard-v1::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(14, 116, 144, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(14, 116, 144, 0.03) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 35%, rgba(0, 0, 0, 0.7), transparent 70%);
+  z-index: 0;
+}
+
+.trace-dashboard-v1 .trace-hero,
+.trace-dashboard-v1 .trace-metrics,
+.trace-dashboard-v1 .trace-filters,
+.trace-dashboard-v1 .trace-layout,
+.trace-dashboard-v1 .trace-footer,
+.trace-dashboard-v1 .trace-error {
+  width: min(1360px, 100%);
+  position: relative;
+  z-index: 1;
+}
+
+.trace-dashboard-v1 .trace-hero h1 {
+  letter-spacing: -0.03em;
+  font-size: clamp(2rem, 3.2vw, 2.7rem);
+  line-height: 0.95;
+  font-weight: 700;
+}
+
+.trace-dashboard-v1 .trace-hero {
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.82), rgba(240, 249, 255, 0.66)),
+    radial-gradient(750px 260px at 0% -20%, rgba(14, 116, 144, 0.16), transparent 56%);
+  border-color: color-mix(in srgb, var(--trace-border) 70%, #7dd3fc);
+  padding: 1.15rem 1.25rem;
+}
+
+.trace-dashboard-v1 .trace-hero-actions {
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.trace-dashboard-v1 .trace-theme-toggle-wrap {
+  border: 1px solid color-mix(in srgb, var(--trace-border) 78%, #7dd3fc);
+  background: color-mix(in srgb, var(--trace-panel-strong) 82%, transparent);
+  padding: 0.2rem 0.28rem 0.2rem 0.5rem;
+  border-radius: 0.78rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--trace-border) 35%, transparent);
+}
+
+.trace-dashboard-v1 .trace-theme-toggle-wrap > span {
+  font-size: 0.66rem;
+  letter-spacing: 0.11em;
+}
+
+.trace-dashboard-v1 .trace-theme-item {
+  font-weight: 700;
+  font-size: 0.74rem;
+  padding: 0.36rem 0.58rem;
+  border-radius: 0.46rem;
+}
+
+.trace-dashboard-v1 .trace-theme-toggle {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--trace-border) 55%, transparent);
+}
+
+.trace-dashboard-v1 .trace-btn {
+  min-height: 2.3rem;
+}
+
+.trace-dashboard-v1 .trace-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(186px, 1fr));
+  gap: 0.75rem;
+}
+
+.trace-dashboard-v1 .trace-metric-card,
+.trace-dashboard-v1 .trace-filters,
+.trace-dashboard-v1 .trace-panel {
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.88), rgba(246, 252, 255, 0.74)),
+    radial-gradient(500px 220px at 5% -10%, rgba(14, 116, 144, 0.08), transparent 62%);
+}
+
+.trace-dashboard-v1 .trace-metric-card {
+  transition: transform 170ms ease, box-shadow 170ms ease, border-color 170ms ease;
+  padding: 0.88rem 0.85rem;
+}
+
+.trace-dashboard-v1 .trace-metric-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--trace-accent) 30%, var(--trace-border));
+  box-shadow: 0 24px 40px rgba(14, 116, 144, 0.1);
+}
+
+.trace-dashboard-v1 .trace-metric-head {
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+}
+
+.trace-dashboard-v1 .trace-metric-card p {
+  font-size: clamp(1.55rem, 2.2vw, 2rem);
+}
+
+.trace-dashboard-v1 .trace-filters h2 {
+  font-size: 1.14rem;
+  margin-bottom: 0.95rem;
+}
+
+.trace-dashboard-v1 .trace-filter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 0.72rem;
+}
+
+.trace-dashboard-v1 .trace-filter-grid label > span,
+.trace-dashboard-v1 .trace-filter-field > span {
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+.trace-dashboard-v1 .trace-date-trigger,
+.trace-dashboard-v1 .trace-filter-grid input,
+.trace-dashboard-v1 .trace-filter-grid select {
+  min-height: 2.48rem;
+}
+
+.trace-dashboard-v1 .trace-time-row input {
+  min-height: 2.05rem;
+}
+
+.trace-dashboard-v1 .trace-panel-head h3 {
+  font-size: 1.13rem;
+}
+
+.trace-dashboard-v1 .trace-panel-head p {
+  font-size: 0.76rem;
+}
+
+.trace-dashboard-v1 .trace-stream {
+  min-height: 330px;
+}
+
+.trace-dashboard-v1 .trace-top-list h3 {
+  font-size: 0.87rem;
+}
+
+.trace-dashboard-v1 .trace-top-row {
+  font-size: 0.78rem;
+}
+
+.trace-dashboard-v1 .trace-top-list {
+  backdrop-filter: blur(6px);
+}
+
+.trace-dashboard-v1.trace-theme-dark {
+  --trace-bg:
+    radial-gradient(1100px 480px at 6% -10%, rgba(8, 145, 178, 0.2), transparent 58%),
+    radial-gradient(900px 420px at 95% 0%, rgba(225, 29, 72, 0.18), transparent 52%),
+    linear-gradient(160deg, #020617, #0f172a 46%, #0b1d2a);
+  --trace-panel: rgba(15, 23, 42, 0.84);
+  --trace-panel-strong: rgba(15, 23, 42, 0.97);
+  --trace-border: #1e3a5f;
+  --trace-shadow: 0 24px 45px rgba(2, 6, 23, 0.58);
+  --trace-ink: #dbeafe;
+  --trace-muted: #93c5fd;
+  --trace-accent: #14b8a6;
+  --trace-danger: #fb7185;
+  --trace-accent-ink: #042f2e;
+}
+
+.trace-dashboard-v1.trace-theme-dark::before {
+  background:
+    linear-gradient(90deg, rgba(20, 184, 166, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(20, 184, 166, 0.04) 1px, transparent 1px);
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-hero {
+  background:
+    linear-gradient(130deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.74)),
+    radial-gradient(700px 220px at 0% -15%, rgba(20, 184, 166, 0.22), transparent 58%);
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-metric-card,
+.trace-dashboard-v1.trace-theme-dark .trace-filters,
+.trace-dashboard-v1.trace-theme-dark .trace-panel {
+  background:
+    linear-gradient(150deg, rgba(15, 23, 42, 0.9), rgba(9, 18, 38, 0.82)),
+    radial-gradient(500px 200px at 5% -10%, rgba(20, 184, 166, 0.1), transparent 62%);
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-theme-item[data-state="on"] {
+  background: color-mix(in srgb, var(--trace-accent) 24%, transparent);
+  color: #a7f3d0;
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-empty-state {
+  background:
+    radial-gradient(280px 110px at 50% 0%, rgba(20, 184, 166, 0.12), transparent 62%),
+    rgba(15, 23, 42, 0.5);
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-empty-state h4 {
+  color: #e2e8f0;
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-btn.ghost {
+  color: #dbeafe;
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-pill.success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+.trace-dashboard-v1.trace-theme-dark .trace-pill.danger {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fda4af;
+}

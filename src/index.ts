@@ -8,7 +8,9 @@ import {
   handleDashboardEventDetail,
   handleDashboardEvents,
   handleDashboardOverview,
+  handleDashboardTopAllowedBy,
   handleDashboardTimeseries,
+  handleDashboardTraces,
   handleDashboardTopDomains,
   handleDashboardTopFlags,
   handleDashboardTopReasons,
@@ -21,7 +23,7 @@ import type { ServerContext } from "./server-context";
 import { BraveClient } from "./services/brave-client";
 import { ContentFetcher } from "./services/content-fetcher";
 import { LlmJudge } from "./services/llm-judge";
-import dashboard from "./dashboard/index.html";
+import dashboardV1 from "./dashboard/v1/index.html";
 
 const config = loadConfig();
 const loggers = createLoggers(config);
@@ -49,8 +51,10 @@ setInterval(() => {
 
 const server = Bun.serve({
   routes: {
-    "/dashboard": dashboard,
-    "/dashboard/": dashboard,
+    "/dashboard": dashboardV1,
+    "/dashboard/": dashboardV1,
+    "/dashboard/v1": dashboardV1,
+    "/dashboard/v1/": dashboardV1,
   },
   hostname: config.host,
   port: config.port,
@@ -92,6 +96,12 @@ const server = Bun.serve({
       } else {
         response = handleDashboardEvents(request, ctx);
       }
+    } else if (pathname === "/v1/dashboard/traces") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardTraces(request, ctx);
+      }
     } else if (pathname.startsWith("/v1/dashboard/events/")) {
       if (request.method !== "GET") {
         response = errorResponse(405, "Method not allowed");
@@ -121,6 +131,12 @@ const server = Bun.serve({
         response = errorResponse(405, "Method not allowed");
       } else {
         response = handleDashboardTopReasons(request, ctx);
+      }
+    } else if (pathname === "/v1/dashboard/top-allowed-by") {
+      if (request.method !== "GET") {
+        response = errorResponse(405, "Method not allowed");
+      } else {
+        response = handleDashboardTopAllowedBy(request, ctx);
       }
     } else if (pathname === "/v1/dashboard/allowlist") {
       if (request.method === "GET") {

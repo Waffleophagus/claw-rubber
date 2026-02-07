@@ -31,6 +31,12 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
       domain: record.domain,
       outputMode: "text",
       outputMaxChars: ctx.config.profileSettings.maxExtractedChars,
+      traceKind: "search-result-fetch",
+      searchContext: {
+        requestId: record.requestId,
+        query: record.query,
+        rank: record.rank ?? null,
+      },
     });
 
     if (processed.kind === "block") {

@@ -41,6 +41,7 @@ export async function handleWebFetch(request: Request, ctx: ServerContext): Prom
       domain,
       outputMode: parsed.data.extractMode,
       outputMaxChars: parsed.data.maxChars,
+      traceKind: "direct-web-fetch",
     });
 
     if (processed.kind === "block") {

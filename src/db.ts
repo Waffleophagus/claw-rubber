@@ -19,6 +19,10 @@ export interface FetchEventInput {
   blockThreshold: number;
   bypassed: boolean;
   durationMs: number;
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
+  searchRequestId?: string | null;
+  searchQuery?: string | null;
+  searchRank?: number | null;
 }
 
 export interface FlaggedPayloadInput {
@@ -55,6 +59,10 @@ export interface DashboardEventsQuery {
   reasonContains?: string;
   flagContains?: string;
   allowedByContains?: string;
+  queryContains?: string;
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
+  minSearchRank?: number;
+  maxSearchRank?: number;
   offset: number;
   limit: number;
 }
@@ -79,6 +87,8 @@ export interface DashboardEventRecord {
   title: string | null;
   query: string | null;
   requestId: string | null;
+  traceKind: "search-result-fetch" | "direct-web-fetch" | "unknown";
+  searchRank: number | null;
 }
 
 export interface DashboardEventDetail extends DashboardEventRecord {
@@ -142,6 +152,7 @@ export class AppDb {
         result_id TEXT PRIMARY KEY,
         request_id TEXT NOT NULL,
         query TEXT NOT NULL,
+        search_rank INTEGER NOT NULL DEFAULT 0,
         url TEXT NOT NULL,
         domain TEXT NOT NULL,
         title TEXT NOT NULL,
@@ -167,6 +178,10 @@ export class AppDb {
         blocked_by TEXT,
         allowed_by TEXT,
         domain_action TEXT,
+        trace_kind TEXT NOT NULL DEFAULT 'unknown',
+        search_request_id TEXT,
+        search_query TEXT,
+        search_rank INTEGER,
         medium_threshold INTEGER,
         block_threshold INTEGER,
         bypassed INTEGER NOT NULL,
@@ -221,8 +236,13 @@ export class AppDb {
     this.ensureColumn("fetch_events", "blocked_by", "TEXT");
     this.ensureColumn("fetch_events", "allowed_by", "TEXT");
     this.ensureColumn("fetch_events", "domain_action", "TEXT");
+    this.ensureColumn("fetch_events", "trace_kind", "TEXT NOT NULL DEFAULT 'unknown'");
+    this.ensureColumn("fetch_events", "search_request_id", "TEXT");
+    this.ensureColumn("fetch_events", "search_query", "TEXT");
+    this.ensureColumn("fetch_events", "search_rank", "INTEGER");
     this.ensureColumn("fetch_events", "medium_threshold", "INTEGER");
     this.ensureColumn("fetch_events", "block_threshold", "INTEGER");
+    this.ensureColumn("search_results_cache", "search_rank", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("flagged_payloads", "fetch_event_id", "INTEGER");
     this.ensureColumn("flagged_payloads", "evidence_json", "TEXT");
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_flagged_payloads_fetch_event_id ON flagged_payloads(fetch_event_id)`);
@@ -241,9 +261,9 @@ export class AppDb {
     const stmt = this.db.prepare(
       `
         INSERT INTO search_results_cache (
-          result_id, request_id, query, url, domain, title, snippet, source,
+          result_id, request_id, query, search_rank, url, domain, title, snippet, source,
           availability, block_reason, created_at, expires_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     );
 
@@ -251,6 +271,7 @@ export class AppDb {
       record.resultId,
       record.requestId,
       record.query,
+      record.rank ?? 0,
       record.url,
       record.domain,
       record.title,
@@ -271,6 +292,7 @@ export class AppDb {
           result_id,
           request_id,
           query,
+          search_rank,
           url,
           domain,
           title,
@@ -290,6 +312,7 @@ export class AppDb {
           result_id: string;
           request_id: string;
           query: string;
+          search_rank: number;
           url: string;
           domain: string;
           title: string;
@@ -310,6 +333,7 @@ export class AppDb {
       resultId: row.result_id,
       requestId: row.request_id,
       query: row.query,
+      rank: row.search_rank,
       url: row.url,
       domain: row.domain,
       title: row.title,
@@ -328,8 +352,9 @@ export class AppDb {
       `
         INSERT INTO fetch_events (
           result_id, url, domain, decision, score, flags_json, reason,
-          blocked_by, allowed_by, domain_action, medium_threshold, block_threshold, bypassed, duration_ms, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          blocked_by, allowed_by, domain_action, trace_kind, search_request_id, search_query, search_rank,
+          medium_threshold, block_threshold, bypassed, duration_ms, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     );
 
@@ -344,6 +369,10 @@ export class AppDb {
       event.blockedBy,
       event.allowedBy,
       event.domainAction,
+      event.traceKind ?? "unknown",
+      event.searchRequestId ?? null,
+      event.searchQuery ?? null,
+      event.searchRank ?? null,
       event.mediumThreshold,
       event.blockThreshold,
       event.bypassed ? 1 : 0,
@@ -608,6 +637,21 @@ export class AppDb {
       .map(([value, count]) => ({ value, count }));
   }
 
+  getDashboardTopAllowedBy(
+    query: Omit<DashboardEventsQuery, "offset" | "limit">,
+    limit: number,
+  ): DashboardTopItem[] {
+    return this.getTopItems(
+      this.getDashboardEventsUnpaginated({
+        ...query,
+        offset: 0,
+        limit: Number.MAX_SAFE_INTEGER,
+      }).filter((event) => event.decision === "allow"),
+      (event) => event.allowedBy,
+      limit,
+    );
+  }
+
   getDashboardEventDetail(eventId: string): DashboardEventDetail | null {
     const [source, rawId] = eventId.split(":", 2);
     const id = Number.parseInt(rawId ?? "", 10);
@@ -620,23 +664,31 @@ export class AppDb {
         .prepare(
           `
             SELECT
-              id,
-              result_id,
-              domain,
-              url,
-              decision,
-              score,
-              flags_json,
-              reason,
-              blocked_by,
-              allowed_by,
-              medium_threshold,
-              block_threshold,
-              bypassed,
-              duration_ms,
-              created_at
-            FROM fetch_events
-            WHERE id = ?
+              fe.id,
+              fe.result_id,
+              fe.domain,
+              fe.url,
+              fe.decision,
+              fe.score,
+              fe.flags_json,
+              fe.reason,
+              fe.blocked_by,
+              fe.allowed_by,
+              fe.trace_kind,
+              fe.search_request_id,
+              fe.search_query,
+              fe.search_rank,
+              fe.medium_threshold,
+              fe.block_threshold,
+              fe.bypassed,
+              fe.duration_ms,
+              fe.created_at,
+              src.request_id AS fallback_request_id,
+              src.query AS fallback_query,
+              src.search_rank AS fallback_rank
+            FROM fetch_events fe
+            LEFT JOIN search_results_cache src ON src.result_id = fe.result_id
+            WHERE fe.id = ?
           `,
         )
         .get(id) as
@@ -651,11 +703,18 @@ export class AppDb {
             reason: string | null;
             blocked_by: string | null;
             allowed_by: string | null;
+            trace_kind: string | null;
+            search_request_id: string | null;
+            search_query: string | null;
+            search_rank: number | null;
             medium_threshold: number | null;
             block_threshold: number | null;
             bypassed: number;
             duration_ms: number;
             created_at: number;
+            fallback_request_id: string | null;
+            fallback_query: string | null;
+            fallback_rank: number | null;
           }
         | undefined;
 
@@ -709,8 +768,10 @@ export class AppDb {
         bypassed: fetchRow.bypassed === 1,
         durationMs: fetchRow.duration_ms,
         title: null,
-        query: null,
-        requestId: null,
+        query: fetchRow.search_query ?? fetchRow.fallback_query ?? null,
+        requestId: fetchRow.search_request_id ?? fetchRow.fallback_request_id ?? null,
+        traceKind: normalizeTraceKind(fetchRow.trace_kind, fetchRow.fallback_request_id),
+        searchRank: fetchRow.search_rank ?? fetchRow.fallback_rank ?? null,
         payloadContent: payload?.content ?? fallbackPayload?.content ?? null,
         evidence: parseEvidence(payload?.evidence_json ?? fallbackPayload?.evidence_json ?? null),
       };
@@ -772,6 +833,8 @@ export class AppDb {
         title: searchRow.title,
         query: searchRow.query,
         requestId: searchRow.request_id,
+        traceKind: "unknown",
+        searchRank: null,
         payloadContent: null,
         evidence: [],
       };
@@ -822,23 +885,31 @@ export class AppDb {
       .prepare(
         `
           SELECT
-            id,
-            result_id,
-            domain,
-            url,
-            decision,
-            score,
-            flags_json,
-            reason,
-            blocked_by,
-            allowed_by,
-            medium_threshold,
-            block_threshold,
-            bypassed,
-            duration_ms,
-            created_at
-          FROM fetch_events
-          WHERE created_at >= ? AND created_at <= ?
+            fe.id,
+            fe.result_id,
+            fe.domain,
+            fe.url,
+            fe.decision,
+            fe.score,
+            fe.flags_json,
+            fe.reason,
+            fe.blocked_by,
+            fe.allowed_by,
+            fe.trace_kind,
+            fe.search_request_id,
+            fe.search_query,
+            fe.search_rank,
+            fe.medium_threshold,
+            fe.block_threshold,
+            fe.bypassed,
+            fe.duration_ms,
+            fe.created_at,
+            src.request_id AS fallback_request_id,
+            src.query AS fallback_query,
+            src.search_rank AS fallback_rank
+          FROM fetch_events fe
+          LEFT JOIN search_results_cache src ON src.result_id = fe.result_id
+          WHERE fe.created_at >= ? AND fe.created_at <= ?
         `,
       )
       .all(from, to) as Array<{
@@ -852,11 +923,18 @@ export class AppDb {
       reason: string | null;
       blocked_by: string | null;
       allowed_by: string | null;
+      trace_kind: string | null;
+      search_request_id: string | null;
+      search_query: string | null;
+      search_rank: number | null;
       medium_threshold: number | null;
       block_threshold: number | null;
       bypassed: number;
       duration_ms: number;
       created_at: number;
+      fallback_request_id: string | null;
+      fallback_query: string | null;
+      fallback_rank: number | null;
     }>;
 
     return rows.map((row) => ({
@@ -877,8 +955,10 @@ export class AppDb {
       bypassed: row.bypassed === 1,
       durationMs: row.duration_ms,
       title: null,
-      query: null,
-      requestId: null,
+      query: row.search_query ?? row.fallback_query ?? null,
+      requestId: row.search_request_id ?? row.fallback_request_id ?? null,
+      traceKind: normalizeTraceKind(row.trace_kind, row.fallback_request_id),
+      searchRank: row.search_rank ?? row.fallback_rank ?? null,
     }));
   }
 
@@ -932,6 +1012,8 @@ export class AppDb {
       title: row.title,
       query: row.query,
       requestId: row.request_id,
+      traceKind: "unknown",
+      searchRank: null,
     }));
   }
 
@@ -965,6 +1047,29 @@ export class AppDb {
     if (query.allowedByContains) {
       const needle = query.allowedByContains.toLowerCase();
       if (!(event.allowedBy ?? "").toLowerCase().includes(needle)) {
+        return false;
+      }
+    }
+
+    if (query.queryContains) {
+      const needle = query.queryContains.toLowerCase();
+      if (!(event.query ?? "").toLowerCase().includes(needle)) {
+        return false;
+      }
+    }
+
+    if (query.traceKind && event.traceKind !== query.traceKind) {
+      return false;
+    }
+
+    if (query.minSearchRank !== undefined) {
+      if (event.searchRank === null || event.searchRank < query.minSearchRank) {
+        return false;
+      }
+    }
+
+    if (query.maxSearchRank !== undefined) {
+      if (event.searchRank === null || event.searchRank > query.maxSearchRank) {
         return false;
       }
     }
@@ -1046,6 +1151,21 @@ function toDetector(value: unknown): EvidenceMatch["detector"] {
   }
 
   return "rule";
+}
+
+function normalizeTraceKind(
+  raw: string | null,
+  fallbackRequestId: string | null,
+): "search-result-fetch" | "direct-web-fetch" | "unknown" {
+  if (raw === "search-result-fetch" || raw === "direct-web-fetch") {
+    return raw;
+  }
+
+  if (fallbackRequestId) {
+    return "search-result-fetch";
+  }
+
+  return "unknown";
 }
 
 function isValidDomainEntry(domain: string): boolean {

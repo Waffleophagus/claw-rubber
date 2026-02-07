@@ -16,6 +16,10 @@ interface DashboardFilters {
   reasonContains?: string;
   flagContains?: string;
   allowedByContains?: string;
+  queryContains?: string;
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
+  minSearchRank?: number;
+  maxSearchRank?: number;
 }
 
 export async function handleDashboardAllowlistGet(_request: Request, ctx: ServerContext): Promise<Response> {
@@ -92,6 +96,10 @@ export function handleDashboardEvents(request: Request, ctx: ServerContext): Res
   });
 }
 
+export function handleDashboardTraces(request: Request, ctx: ServerContext): Response {
+  return handleDashboardEvents(request, ctx);
+}
+
 export function handleDashboardEventDetail(request: Request, ctx: ServerContext): Response {
   const { pathname } = new URL(request.url);
   const eventId = decodeURIComponent(pathname.slice("/v1/dashboard/events/".length)).trim();
@@ -146,6 +154,14 @@ export function handleDashboardTopReasons(request: Request, ctx: ServerContext):
   return jsonResponse({ filters, items });
 }
 
+export function handleDashboardTopAllowedBy(request: Request, ctx: ServerContext): Response {
+  const url = new URL(request.url);
+  const filters = parseFilters(request);
+  const limit = clampInt(url.searchParams.get("limit"), 10, 1, 100);
+  const items = ctx.db.getDashboardTopAllowedBy(filters, limit);
+  return jsonResponse({ filters, items });
+}
+
 function parseFilters(request: Request): DashboardFilters {
   const url = new URL(request.url);
   const now = Date.now();
@@ -156,13 +172,22 @@ function parseFilters(request: Request): DashboardFilters {
   const sourceRaw = url.searchParams.get("source");
   const decisionRaw = url.searchParams.get("decision");
 
-  const source = sourceRaw === "fetch" || sourceRaw === "search" ? sourceRaw : "all";
-  const decision = decisionRaw === "allow" || decisionRaw === "block" ? decisionRaw : "block";
+  const source = sourceRaw === "fetch" || sourceRaw === "search" ? sourceRaw : "fetch";
+  const decision = decisionRaw === "allow" || decisionRaw === "block" ? decisionRaw : "all";
 
   const domainContains = cleanFilterValue(url.searchParams.get("domain"));
   const reasonContains = cleanFilterValue(url.searchParams.get("reason"));
   const flagContains = cleanFilterValue(url.searchParams.get("flag"));
   const allowedByContains = cleanFilterValue(url.searchParams.get("allowed_by"));
+  const queryContains = cleanFilterValue(url.searchParams.get("query"));
+
+  const traceKindRaw = cleanFilterValue(url.searchParams.get("trace_kind"));
+  const traceKind = traceKindRaw === "search-result-fetch" || traceKindRaw === "direct-web-fetch" || traceKindRaw === "unknown"
+    ? traceKindRaw
+    : undefined;
+
+  const minSearchRank = cleanPositiveInt(url.searchParams.get("rank_min"));
+  const maxSearchRank = cleanPositiveInt(url.searchParams.get("rank_max"));
 
   return {
     from,
@@ -173,6 +198,10 @@ function parseFilters(request: Request): DashboardFilters {
     reasonContains,
     flagContains,
     allowedByContains,
+    queryContains,
+    traceKind,
+    minSearchRank,
+    maxSearchRank,
   };
 }
 
@@ -202,5 +231,16 @@ function clampInt(raw: string | null, fallback: number, min: number, max: number
     return max;
   }
 
+  return parsed;
+}
+
+function cleanPositiveInt(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return undefined;
+  }
   return parsed;
 }

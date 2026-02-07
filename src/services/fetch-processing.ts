@@ -12,6 +12,12 @@ interface FetchProcessingInput {
   domain: string;
   outputMode?: ExtractMode;
   outputMaxChars?: number;
+  traceKind?: "search-result-fetch" | "direct-web-fetch" | "unknown";
+  searchContext?: {
+    requestId: string;
+    query: string;
+    rank: number | null;
+  };
 }
 
 interface SourceMeta {
@@ -58,6 +64,7 @@ export async function processFetchedPage(
   ctx: ServerContext,
   input: FetchProcessingInput,
 ): Promise<ProcessedFetch> {
+  const traceKind = classifyTraceKind(input.traceKind, input.searchContext);
   const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains);
   const domainPolicy = evaluateDomainPolicy(input.domain, effectiveAllowlist, ctx.config.blocklistDomains);
   if (domainPolicy.action === "block") {
@@ -76,6 +83,10 @@ export async function processFetchedPage(
       blockThreshold: ctx.config.profileSettings.blockThreshold,
       bypassed: false,
       durationMs: Date.now() - input.startedAt,
+      traceKind,
+      searchRequestId: input.searchContext?.requestId ?? null,
+      searchQuery: input.searchContext?.query ?? null,
+      searchRank: input.searchContext?.rank ?? null,
     });
 
     ctx.loggers.security.warn(
@@ -173,6 +184,10 @@ export async function processFetchedPage(
     blockThreshold: ctx.config.profileSettings.blockThreshold,
     bypassed: decision.bypassed ?? false,
     durationMs: Date.now() - input.startedAt,
+    traceKind,
+    searchRequestId: input.searchContext?.requestId ?? null,
+    searchQuery: input.searchContext?.query ?? null,
+    searchRank: input.searchContext?.rank ?? null,
   });
 
   if (decision.decision === "block") {
@@ -307,4 +322,19 @@ function classifyAllowedBy(
   }
 
   return null;
+}
+
+function classifyTraceKind(
+  traceKind: FetchProcessingInput["traceKind"] | undefined,
+  searchContext: FetchProcessingInput["searchContext"] | undefined,
+): "search-result-fetch" | "direct-web-fetch" | "unknown" {
+  if (traceKind && traceKind !== "unknown") {
+    return traceKind;
+  }
+
+  if (searchContext) {
+    return "search-result-fetch";
+  }
+
+  return traceKind ?? "unknown";
 }

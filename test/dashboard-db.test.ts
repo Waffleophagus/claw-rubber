@@ -210,6 +210,23 @@ describe("dashboard db", () => {
   test("dashboard events combine fetch and search sources with filters", () => {
     const { db, path } = createDb();
     try {
+      const now = Date.now();
+      db.storeSearchResult({
+        resultId: "result-fetch-1",
+        requestId: "req-search-1",
+        query: "victorian architecture",
+        rank: 2,
+        url: "https://review.example",
+        domain: "review.example",
+        title: "Victorian Architecture Overview",
+        snippet: "History of Victorian style architecture",
+        source: "review.example",
+        availability: "allowed",
+        blockReason: null,
+        createdAt: now,
+        expiresAt: now + 60_000,
+      });
+
       db.storeSearchBlockEvent({
         requestId: "req-1",
         resultId: "result-search-1",
@@ -253,9 +270,9 @@ describe("dashboard db", () => {
         blockThreshold: 10,
         bypassed: false,
         durationMs: 80,
+        traceKind: "direct-web-fetch",
       });
 
-      const now = Date.now();
       const baseQuery = {
         from: now - 60_000,
         to: now + 60_000,
@@ -284,6 +301,27 @@ describe("dashboard db", () => {
       });
       expect(allowedByLanguage.total).toBe(1);
       expect(allowedByLanguage.events[0]?.allowedBy).toBe("language-exception");
+      expect(allowedByLanguage.events[0]?.traceKind).toBe("search-result-fetch");
+      expect(allowedByLanguage.events[0]?.searchRank).toBe(2);
+      expect(allowedByLanguage.events[0]?.query).toBe("victorian architecture");
+
+      const directWebFetchOnly = db.getDashboardEvents({
+        ...baseQuery,
+        decision: "block",
+        source: "fetch",
+        traceKind: "direct-web-fetch",
+      });
+      expect(directWebFetchOnly.total).toBe(1);
+      expect(directWebFetchOnly.events[0]?.domain).toBe("bad.example");
+
+      const rankFiltered = db.getDashboardEvents({
+        ...baseQuery,
+        decision: "allow",
+        minSearchRank: 2,
+        maxSearchRank: 2,
+      });
+      expect(rankFiltered.total).toBe(1);
+      expect(rankFiltered.events[0]?.domain).toBe("review.example");
 
       const overview = db.getDashboardOverview({
         from: now - 60_000,

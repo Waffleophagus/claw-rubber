@@ -40,7 +40,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
     ctx.db.storeSearchRequest(requestId, body.query, brave.raw);
 
     const now = Date.now();
-    const records: SearchResultRecord[] = brave.results.map((item) => {
+    const records: SearchResultRecord[] = brave.results.map((item, index) => {
       const resultId = crypto.randomUUID();
       const domain = safeDomain(item.url);
       const domainPolicy = evaluateDomainPolicy(domain, effectiveAllowlist, ctx.config.blocklistDomains);
@@ -49,6 +49,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
         resultId,
         requestId,
         query: body.query,
+        rank: index + 1,
         url: item.url,
         domain,
         title: item.title,
@@ -84,6 +85,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
         title: record.title,
         snippet: record.snippet,
         source: record.source,
+        rank: record.rank ?? undefined,
         availability: record.availability,
       };
 

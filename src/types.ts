@@ -19,6 +19,7 @@ export interface SearchResultRecord {
   resultId: string;
   requestId: string;
   query: string;
+  rank?: number | null;
   url: string;
   domain: string;
   title: string;
@@ -35,6 +36,7 @@ export interface SearchResultResponse {
   title: string;
   snippet: string;
   source: string;
+  rank?: number;
   published?: string;
   availability: Availability;
   risk_hint?: "low" | "medium" | "high";

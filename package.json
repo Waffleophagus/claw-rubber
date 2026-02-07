@@ -21,6 +21,9 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.25",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-toggle-group": "^1.1.11",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "ai": "^6.0.73",
     "bun-plugin-tailwind": "^0.1.2",
     "class-variance-authority": "^0.7.1",
@@ -29,6 +32,7 @@
     "ollama-ai-provider": "^1.2.0",
     "pino": "^10.3.0",
     "react": "^19.2.4",
+    "react-day-picker": "^9.13.1",
     "react-dom": "^19.2.4",
     "recharts": "^3.7.0",
     "rotating-file-stream": "^3.2.8",
