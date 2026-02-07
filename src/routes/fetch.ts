@@ -57,7 +57,7 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
       );
     }
 
-    return jsonResponse({
+    const payload: Record<string, unknown> = {
       result_id: resultId,
       content: processed.content,
       content_summary: processed.contentSummary,
@@ -68,7 +68,14 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
         rendered: processed.source.rendered,
         fallback_used: processed.source.fallback_used,
       },
-    });
+    };
+
+    if (ctx.config.exposeSafeContentUrls) {
+      payload.url = record.url;
+      payload.final_url = processed.source.final_url;
+    }
+
+    return jsonResponse(payload);
   } catch (error) {
     ctx.loggers.app.error({ error, resultId, url: record.url }, "fetch request failed");
     return errorResponse(502, "Failed to fetch upstream page content");

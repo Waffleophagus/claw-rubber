@@ -48,29 +48,61 @@ export async function handleWebFetch(request: Request, ctx: ServerContext): Prom
       return jsonResponse(
         {
           fetch_id: fetchId,
-          url: requestedUrl,
-          final_url: processed.source?.final_url,
           extract_mode: parsed.data.extractMode,
           safety: processed.safety,
-          source: processed.source,
+          source: toResponseSource(processed.source),
         },
         422,
       );
     }
 
-    return jsonResponse({
+    const payload: Record<string, unknown> = {
       fetch_id: fetchId,
-      url: requestedUrl,
-      final_url: processed.source.final_url,
       extract_mode: parsed.data.extractMode,
       content: processed.content,
       content_summary: processed.contentSummary,
       truncated: processed.truncated,
       safety: processed.safety,
-      source: processed.source,
-    });
+      source: toResponseSource(processed.source),
+    };
+
+    if (ctx.config.exposeSafeContentUrls) {
+      payload.url = requestedUrl;
+      payload.final_url = processed.source.final_url;
+    }
+
+    return jsonResponse(payload);
   } catch (error) {
     ctx.loggers.app.error({ error, fetchId, url: requestedUrl }, "web fetch request failed");
     return errorResponse(502, "Failed to fetch upstream page content");
   }
+}
+
+function toResponseSource(
+  source: {
+    domain: string;
+    fetch_backend: "http-fetch" | "browserless";
+    rendered: boolean;
+    fallback_used: boolean;
+    final_url: string;
+    content_type: string;
+  } | undefined,
+): {
+  domain: string;
+  fetch_backend: "http-fetch" | "browserless";
+  rendered: boolean;
+  fallback_used: boolean;
+  content_type: string;
+} | undefined {
+  if (!source) {
+    return undefined;
+  }
+
+  return {
+    domain: source.domain,
+    fetch_backend: source.fetch_backend,
+    rendered: source.rendered,
+    fallback_used: source.fallback_used,
+    content_type: source.content_type,
+  };
 }

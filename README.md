@@ -96,6 +96,9 @@ Notes:
 ## URL Exposure
 Search URLs are redacted by default. Set `CLAWRUBBER_REDACT_URLS=false` to include URLs in `/v1/search` responses.
 
+Successful full-content responses (`/v1/fetch` and `/v1/web-fetch`) include vetted `url` and `final_url` by default.
+Set `CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS=false` to hide these URL fields.
+
 ## Brave Rate Limiting
 Brave requests are rate-limited through an internal queue to avoid 429s under burst traffic.
 
@@ -125,6 +128,7 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 - `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX` (default `1`)
 - `CLAWRUBBER_PROFILE=baseline|strict|paranoid`
 - `CLAWRUBBER_REDACT_URLS=true|false`
+- `CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS=true|false` (default `true`)
 - `CLAWRUBBER_FAIL_CLOSED=true|false`
 - `CLAWRUBBER_ALLOWLIST_DOMAINS=example.com,docs.example.com`
 - `CLAWRUBBER_BLOCKLIST_DOMAINS=bad.example`

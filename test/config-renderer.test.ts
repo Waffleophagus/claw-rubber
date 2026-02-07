@@ -12,6 +12,7 @@ test("uses none renderer backend by default", () => {
   expect(config.braveRateLimit.queueMax).toBe(10);
   expect(config.braveRateLimit.retryOn429).toBe(true);
   expect(config.braveRateLimit.retryMax).toBe(1);
+  expect(config.exposeSafeContentUrls).toBe(true);
 });
 
 test("parses CLAWRUBBER renderer settings", () => {
@@ -78,4 +79,12 @@ test("parses extra language-name allowlist entries", () => {
   });
 
   expect(config.languageNameAllowlistExtra).toEqual(["klingon", "tlhingan hol"]);
+});
+
+test("parses safe content URL exposure toggle", () => {
+  const config = loadConfig({
+    CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS: "false",
+  });
+
+  expect(config.exposeSafeContentUrls).toBe(false);
 });

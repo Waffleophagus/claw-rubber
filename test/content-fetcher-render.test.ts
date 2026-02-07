@@ -25,6 +25,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       maxRedirects: 3,
     },
     redactedUrls: true,
+    exposeSafeContentUrls: true,
     failClosed: true,
     allowlistDomains: [],
     blocklistDomains: [],

@@ -124,6 +124,68 @@ export async function processFetchedPage(
     );
   }
 
+  let finalDomain = input.domain;
+  try {
+    finalDomain = new URL(fetched.finalUrl).hostname.toLowerCase();
+  } catch {
+    finalDomain = input.domain;
+  }
+
+  const finalDomainPolicy = evaluateDomainPolicy(finalDomain, effectiveAllowlist, ctx.config.blocklistDomains);
+  if (finalDomainPolicy.action === "block") {
+    const reason = `Redirected final URL blocked: ${finalDomainPolicy.reason ?? "Domain blocked"}`;
+    ctx.db.storeFetchEvent({
+      resultId: input.eventId,
+      url: input.url,
+      domain: finalDomain,
+      decision: "block",
+      score: 0,
+      flags: ["domain_blocklist", "redirect_domain_blocklist"],
+      reason,
+      blockedBy: "domain-policy",
+      allowedBy: null,
+      domainAction: finalDomainPolicy.action,
+      mediumThreshold: ctx.config.profileSettings.mediumThreshold,
+      blockThreshold: ctx.config.profileSettings.blockThreshold,
+      bypassed: false,
+      durationMs: Date.now() - input.startedAt,
+      traceKind,
+      searchRequestId: input.searchContext?.requestId ?? null,
+      searchQuery: input.searchContext?.query ?? null,
+      searchRank: input.searchContext?.rank ?? null,
+    });
+
+    ctx.loggers.security.warn(
+      {
+        eventId: input.eventId,
+        requestedDomain: input.domain,
+        finalDomain,
+        reason,
+      },
+      "blocked fetch due to redirected final domain blocklist",
+    );
+
+    return {
+      kind: "block",
+      source: {
+        domain: finalDomain,
+        fetch_backend: fetched.backendUsed,
+        rendered: fetched.rendered,
+        fallback_used: fetched.fallbackUsed,
+        final_url: fetched.finalUrl,
+        content_type: fetched.contentType,
+      },
+      safety: {
+        decision: "block",
+        score: 0,
+        flags: ["domain_blocklist", "redirect_domain_blocklist"],
+        reason,
+        normalization_applied: [],
+        obfuscation_signals: [],
+      },
+    };
+  }
+
   const scoringText = sanitizeToText(fetched.body, ctx.config.profileSettings.maxExtractedChars);
   const extracted = extractContent(fetched.body, input.outputMode ?? "text", input.outputMaxChars);
 

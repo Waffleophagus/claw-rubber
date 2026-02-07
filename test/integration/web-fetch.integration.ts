@@ -16,6 +16,7 @@ integration.test("integration: /v1/web-fetch contract", async () => {
   const payload = await response.json() as {
     fetch_id?: string;
     url?: string;
+    final_url?: string;
     extract_mode?: "text" | "markdown";
     content?: string;
     truncated?: boolean;
@@ -25,11 +26,12 @@ integration.test("integration: /v1/web-fetch contract", async () => {
   };
 
   expect(typeof payload.fetch_id).toBe("string");
-  expect(payload.url).toBe("https://example.com/");
   expect(payload.extract_mode).toBe("markdown");
   expect(typeof payload.safety?.decision).toBe("string");
 
   if (response.status === 200) {
+    expect(payload.url).toBe("https://example.com/");
+    expect(typeof payload.final_url).toBe("string");
     expect(typeof payload.content).toBe("string");
     expect(payload.content!.length).toBeGreaterThan(0);
     expect(payload.truncated).toBe(false);

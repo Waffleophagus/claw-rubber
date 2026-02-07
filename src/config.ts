@@ -42,6 +42,7 @@ export interface AppConfig {
   profile: ProfileName;
   profileSettings: ProfileSettings;
   redactedUrls: boolean;
+  exposeSafeContentUrls: boolean;
   failClosed: boolean;
   allowlistDomains: string[];
   blocklistDomains: string[];
@@ -122,6 +123,7 @@ const EnvSchema = z.object({
   CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX: z.string().optional(),
   CLAWRUBBER_PROFILE: z.enum(["baseline", "strict", "paranoid"]).default("strict"),
   CLAWRUBBER_REDACT_URLS: z.string().optional(),
+  CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS: z.string().optional(),
   CLAWRUBBER_FAIL_CLOSED: z.string().optional(),
   CLAWRUBBER_ALLOWLIST_DOMAINS: z.string().optional(),
   CLAWRUBBER_BLOCKLIST_DOMAINS: z.string().optional(),
@@ -237,6 +239,7 @@ export function loadConfig(env = process.env): AppConfig {
     profile: parsed.CLAWRUBBER_PROFILE,
     profileSettings,
     redactedUrls: toBoolean(parsed.CLAWRUBBER_REDACT_URLS, true),
+    exposeSafeContentUrls: toBoolean(parsed.CLAWRUBBER_EXPOSE_SAFE_CONTENT_URLS, true),
     failClosed: toBoolean(parsed.CLAWRUBBER_FAIL_CLOSED, true),
     allowlistDomains: parseDomainList(parsed.CLAWRUBBER_ALLOWLIST_DOMAINS),
     blocklistDomains: parseDomainList(parsed.CLAWRUBBER_BLOCKLIST_DOMAINS),

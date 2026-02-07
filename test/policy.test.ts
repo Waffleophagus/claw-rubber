@@ -25,6 +25,7 @@ function mockConfig(): AppConfig {
       maxRedirects: 3,
     },
     redactedUrls: true,
+    exposeSafeContentUrls: true,
     failClosed: true,
     allowlistDomains: [],
     blocklistDomains: [],
