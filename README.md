@@ -71,6 +71,16 @@ Open:
 http://localhost:3000/dashboard
 ```
 
+Seed local dashboard data (for local UI testing):
+```bash
+bun run db:seed -- --reset
+```
+
+Optional seeding flags:
+- `--db ./data/claw-rubber.db` to target a specific SQLite file
+- `--fetch-events 200` to increase synthetic fetch traces
+- `--search-blocks 40` to increase synthetic search-block traces
+
 Runtime allowlist behavior:
 - Added domains are persisted in SQLite and applied immediately.
 - Blocklist still has highest precedence (blocklist always wins).
