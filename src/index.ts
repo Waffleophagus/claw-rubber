@@ -83,6 +83,7 @@ loggers.app.info(
     llmJudgeEnabled: config.llmJudgeEnabled,
     allowlistSize: config.allowlistDomains.length,
     blocklistSize: config.blocklistDomains.length,
+    websiteRendererBackend: config.websiteRendererBackend,
   },
   "claw-rubber started",
 );

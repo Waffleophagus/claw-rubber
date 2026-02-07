@@ -8,6 +8,7 @@ The proxy will:
 - Query Brave Web Search for discovery.
 - Return sanitized metadata and opaque IDs to OpenClaw.
 - Fetch result pages server-side by opaque ID.
+- Optionally fetch fully rendered pages through Browserless.
 - Apply prompt-injection defenses before returning content.
 - Persist malicious/flagged payloads and audit events.
 - Support configurable safety profiles and optional model-based adjudication.
@@ -73,8 +74,8 @@ Response (block):
 
 ## Domain Policy (Allowlist + Blocklist)
 Config:
-- `CR_ALLOWLIST_DOMAINS` (comma-separated domains)
-- `CR_BLOCKLIST_DOMAINS` (comma-separated domains)
+- `CLAWRUBBER_ALLOWLIST_DOMAINS` (comma-separated domains)
+- `CLAWRUBBER_BLOCKLIST_DOMAINS` (comma-separated domains)
 
 Rules:
 1. Blocklist has highest priority:
@@ -101,6 +102,8 @@ Matching behavior:
 - Localhost/private CIDR rejection (anti-SSRF).
 - Content-type allowlist and max body size.
 - Request timeout and user-agent control.
+- Optional Browserless renderer backend for JavaScript-rendered pages.
+- Configurable fallback from Browserless to plain HTTP fetch.
 
 ### Injection defenses
 - Deterministic heuristic scoring based on OWASP guidance:
@@ -139,19 +142,28 @@ Retention:
 - Configurable retention days for flagged payloads and logs.
 
 ## Config Surface
-- `BRAVE_API_KEY`
-- `CR_PROFILE=baseline|strict|paranoid` (default `strict`)
-- `CR_REDACT_URLS=true|false` (default `true`)
-- `CR_FAIL_CLOSED=true|false` (default `true`)
-- `CR_ALLOWLIST_DOMAINS=...`
-- `CR_BLOCKLIST_DOMAINS=...`
-- `CR_DB_PATH` (default `/data/claw-rubber.db`)
-- `CR_LOG_DIR` (default `/data/logs`)
-- `CR_RETENTION_DAYS` (default `30`)
-- `CR_LLM_JUDGE_ENABLED=true|false` (default `false`)
-- `CR_LLM_PROVIDER=openai|ollama`
-- `CR_LLM_MODEL=...`
-- Provider keys/endpoints (`OPENAI_API_KEY`, `OLLAMA_BASE_URL`)
+- `CLAWRUBBER_BRAVE_API_KEY`
+- `CLAWRUBBER_PROFILE=baseline|strict|paranoid` (default `strict`)
+- `CLAWRUBBER_REDACT_URLS=true|false` (default `true`)
+- `CLAWRUBBER_FAIL_CLOSED=true|false` (default `true`)
+- `CLAWRUBBER_ALLOWLIST_DOMAINS=...`
+- `CLAWRUBBER_BLOCKLIST_DOMAINS=...`
+- `CLAWRUBBER_DB_PATH` (default `/data/claw-rubber.db`)
+- `CLAWRUBBER_LOG_DIR` (default `/data/logs`)
+- `CLAWRUBBER_RETENTION_DAYS` (default `30`)
+- `CLAWRUBBER_LLM_JUDGE_ENABLED=true|false` (default `false`)
+- `CLAWRUBBER_LLM_PROVIDER=openai|ollama`
+- `CLAWRUBBER_LLM_MODEL=...`
+- Provider keys/endpoints (`CLAWRUBBER_OPENAI_API_KEY`, `CLAWRUBBER_OLLAMA_BASE_URL`)
+- `CLAWRUBBER_WEBSITE_RENDERER_BACKEND=none|browserless` (default `none`)
+- `CLAWRUBBER_BROWSERLESS_URL` (default `http://browserless:3000`)
+- `CLAWRUBBER_BROWSERLESS_TOKEN`
+- `CLAWRUBBER_BROWSERLESS_TIMEOUT_MS` (default `12000`)
+- `CLAWRUBBER_BROWSERLESS_WAIT_UNTIL=domcontentloaded|load|networkidle`
+- `CLAWRUBBER_BROWSERLESS_WAIT_FOR_SELECTOR`
+- `CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES` (default `1500000`)
+- `CLAWRUBBER_BROWSERLESS_FALLBACK_TO_HTTP=true|false` (default `true`)
+- `CLAWRUBBER_BROWSERLESS_BLOCK_ADS=true|false` (default `true`)
 
 ## OpenClaw Skill File
 Create a skill markdown for OpenClaw users to enforce:

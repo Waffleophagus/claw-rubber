@@ -11,6 +11,8 @@ export function handleHealthz(_request: Request, ctx: ServerContext): Response {
       brave_api_key_configured: braveConfigured,
       llm_judge_enabled: ctx.config.llmJudgeEnabled,
       profile: ctx.config.profile,
+      website_renderer_backend: ctx.config.websiteRendererBackend,
+      browserless_configured: ctx.config.websiteRendererBackend === "none" ? false : Boolean(ctx.config.browserless.baseUrl),
     },
   });
 }

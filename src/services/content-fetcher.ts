@@ -1,5 +1,6 @@
 import type { AppConfig } from "../config";
-import { assertPublicHost } from "../lib/network";
+import { assertPublicHost as assertPublicHostDefault } from "../lib/network";
+import { BrowserlessClient, type RenderClient } from "./browserless-client";
 
 const ALLOWED_CONTENT_TYPES = ["text/html", "text/plain", "application/xhtml+xml"];
 
@@ -7,10 +8,32 @@ export interface FetchResult {
   finalUrl: string;
   contentType: string;
   body: string;
+  backendUsed: "http-fetch" | "browserless";
+  rendered: boolean;
+  fallbackUsed: boolean;
+}
+
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+interface ContentFetcherDeps {
+  browserlessClient?: RenderClient;
+  assertPublicHost?: (host: string) => Promise<void>;
+  fetchImpl?: FetchLike;
 }
 
 export class ContentFetcher {
-  constructor(private readonly config: AppConfig) {}
+  private readonly browserlessClient: RenderClient;
+  private readonly assertPublicHost: (host: string) => Promise<void>;
+  private readonly fetchImpl: FetchLike;
+
+  constructor(
+    private readonly config: AppConfig,
+    deps: ContentFetcherDeps = {},
+  ) {
+    this.browserlessClient = deps.browserlessClient ?? new BrowserlessClient(config);
+    this.assertPublicHost = deps.assertPublicHost ?? assertPublicHostDefault;
+    this.fetchImpl = deps.fetchImpl ?? fetch;
+  }
 
   async fetchPage(url: string): Promise<FetchResult> {
     const first = new URL(url);
@@ -19,12 +42,51 @@ export class ContentFetcher {
       throw new Error("Only https URLs are allowed");
     }
 
+    await this.assertPublicHost(first.hostname);
+
+    if (this.config.websiteRendererBackend === "browserless") {
+      try {
+        const rendered = await this.browserlessClient.render(url);
+        return {
+          finalUrl: rendered.finalUrl,
+          contentType: "text/html",
+          body: rendered.html,
+          backendUsed: "browserless",
+          rendered: true,
+          fallbackUsed: false,
+        };
+      } catch (error) {
+        if (!this.config.browserless.fallbackToHttp) {
+          throw error;
+        }
+
+        const fallback = await this.fetchViaHttp(url);
+        return {
+          ...fallback,
+          backendUsed: "http-fetch",
+          rendered: false,
+          fallbackUsed: true,
+        };
+      }
+    }
+
+    const fetched = await this.fetchViaHttp(url);
+    return {
+      ...fetched,
+      backendUsed: "http-fetch",
+      rendered: false,
+      fallbackUsed: false,
+    };
+  }
+
+  private async fetchViaHttp(url: string): Promise<Pick<FetchResult, "finalUrl" | "contentType" | "body">> {
+    const first = new URL(url);
     let current = first;
 
     for (let i = 0; i <= this.config.profileSettings.maxRedirects; i += 1) {
-      await assertPublicHost(current.hostname);
+      await this.assertPublicHost(current.hostname);
 
-      const response = await fetch(current, {
+      const response = await this.fetchImpl(current, {
         method: "GET",
         redirect: "manual",
         headers: {

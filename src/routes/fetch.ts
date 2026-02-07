@@ -64,6 +64,18 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
 
   try {
     const fetched = await ctx.contentFetcher.fetchPage(record.url);
+    if (fetched.fallbackUsed) {
+      ctx.loggers.app.warn(
+        {
+          resultId,
+          domain: record.domain,
+          requestedUrl: record.url,
+          backendUsed: fetched.backendUsed,
+        },
+        "browserless fetch failed, used http fallback",
+      );
+    }
+
     const cleanText = sanitizeToText(fetched.body, ctx.config.profileSettings.maxExtractedChars);
 
     let score = 0;
@@ -128,6 +140,12 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
       return jsonResponse(
         {
           result_id: resultId,
+          source: {
+            domain: record.domain,
+            fetch_backend: fetched.backendUsed,
+            rendered: fetched.rendered,
+            fallback_used: fetched.fallbackUsed,
+          },
           safety: {
             decision: "block",
             score: decision.score,
@@ -151,6 +169,9 @@ export async function handleFetch(request: Request, ctx: ServerContext): Promise
       },
       source: {
         domain: record.domain,
+        fetch_backend: fetched.backendUsed,
+        rendered: fetched.rendered,
+        fallback_used: fetched.fallbackUsed,
       },
     });
   } catch (error) {

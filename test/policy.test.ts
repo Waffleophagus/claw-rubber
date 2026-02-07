@@ -31,6 +31,17 @@ function mockConfig(): AppConfig {
     openaiApiKey: "",
     ollamaBaseUrl: "http://localhost:11434/api",
     userAgent: "test-agent",
+    websiteRendererBackend: "none",
+    browserless: {
+      baseUrl: "http://browserless:3000",
+      token: "",
+      timeoutMs: 12_000,
+      waitUntil: "networkidle",
+      waitForSelector: "",
+      maxHtmlBytes: 1_500_000,
+      fallbackToHttp: true,
+      blockAds: true,
+    },
   };
 }
 

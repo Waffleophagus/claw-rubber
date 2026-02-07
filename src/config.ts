@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export type ProfileName = "baseline" | "strict" | "paranoid";
+export type WebsiteRendererBackend = "none" | "browserless";
+export type BrowserlessWaitUntil = "domcontentloaded" | "load" | "networkidle";
 
 export interface ProfileSettings {
   mediumThreshold: number;
@@ -9,6 +11,17 @@ export interface ProfileSettings {
   maxExtractedChars: number;
   fetchTimeoutMs: number;
   maxRedirects: number;
+}
+
+export interface BrowserlessSettings {
+  baseUrl: string;
+  token: string;
+  timeoutMs: number;
+  waitUntil: BrowserlessWaitUntil;
+  waitForSelector: string;
+  maxHtmlBytes: number;
+  fallbackToHttp: boolean;
+  blockAds: boolean;
 }
 
 export interface AppConfig {
@@ -32,6 +45,8 @@ export interface AppConfig {
   openaiApiKey: string;
   ollamaBaseUrl: string;
   userAgent: string;
+  websiteRendererBackend: WebsiteRendererBackend;
+  browserless: BrowserlessSettings;
 }
 
 const profiles: Record<ProfileName, ProfileSettings> = {
@@ -64,23 +79,32 @@ const profiles: Record<ProfileName, ProfileSettings> = {
 const EnvSchema = z.object({
   PORT: z.string().optional(),
   HOST: z.string().optional(),
-  BRAVE_API_KEY: z.string().default(""),
-  CR_BRAVE_API_BASE_URL: z.string().default("https://api.search.brave.com/res/v1"),
-  CR_PROFILE: z.enum(["baseline", "strict", "paranoid"]).default("strict"),
-  CR_REDACT_URLS: z.string().optional(),
-  CR_FAIL_CLOSED: z.string().optional(),
-  CR_ALLOWLIST_DOMAINS: z.string().optional(),
-  CR_BLOCKLIST_DOMAINS: z.string().optional(),
-  CR_DB_PATH: z.string().default("./data/claw-rubber.db"),
-  CR_LOG_DIR: z.string().default("./data/logs"),
-  CR_RESULT_TTL_MINUTES: z.string().optional(),
-  CR_RETENTION_DAYS: z.string().optional(),
-  CR_LLM_JUDGE_ENABLED: z.string().optional(),
-  CR_LLM_PROVIDER: z.enum(["openai", "ollama"]).default("openai"),
-  CR_LLM_MODEL: z.string().default("gpt-4o-mini"),
-  OPENAI_API_KEY: z.string().default(""),
-  OLLAMA_BASE_URL: z.string().default("http://localhost:11434/api"),
-  CR_USER_AGENT: z.string().default("claw-rubber/0.1 (+https://github.com/)"),
+  CLAWRUBBER_BRAVE_API_KEY: z.string().default(""),
+  CLAWRUBBER_BRAVE_API_BASE_URL: z.string().default("https://api.search.brave.com/res/v1"),
+  CLAWRUBBER_PROFILE: z.enum(["baseline", "strict", "paranoid"]).default("strict"),
+  CLAWRUBBER_REDACT_URLS: z.string().optional(),
+  CLAWRUBBER_FAIL_CLOSED: z.string().optional(),
+  CLAWRUBBER_ALLOWLIST_DOMAINS: z.string().optional(),
+  CLAWRUBBER_BLOCKLIST_DOMAINS: z.string().optional(),
+  CLAWRUBBER_DB_PATH: z.string().default("./data/claw-rubber.db"),
+  CLAWRUBBER_LOG_DIR: z.string().default("./data/logs"),
+  CLAWRUBBER_RESULT_TTL_MINUTES: z.string().optional(),
+  CLAWRUBBER_RETENTION_DAYS: z.string().optional(),
+  CLAWRUBBER_LLM_JUDGE_ENABLED: z.string().optional(),
+  CLAWRUBBER_LLM_PROVIDER: z.enum(["openai", "ollama"]).default("openai"),
+  CLAWRUBBER_LLM_MODEL: z.string().default("gpt-4o-mini"),
+  CLAWRUBBER_OPENAI_API_KEY: z.string().default(""),
+  CLAWRUBBER_OLLAMA_BASE_URL: z.string().default("http://localhost:11434/api"),
+  CLAWRUBBER_USER_AGENT: z.string().default("claw-rubber/0.1 (+https://github.com/)"),
+  CLAWRUBBER_WEBSITE_RENDERER_BACKEND: z.enum(["none", "browserless"]).default("none"),
+  CLAWRUBBER_BROWSERLESS_URL: z.string().default("http://browserless:3000"),
+  CLAWRUBBER_BROWSERLESS_TOKEN: z.string().default(""),
+  CLAWRUBBER_BROWSERLESS_TIMEOUT_MS: z.string().optional(),
+  CLAWRUBBER_BROWSERLESS_WAIT_UNTIL: z.enum(["domcontentloaded", "load", "networkidle"]).default("networkidle"),
+  CLAWRUBBER_BROWSERLESS_WAIT_FOR_SELECTOR: z.string().default(""),
+  CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES: z.string().optional(),
+  CLAWRUBBER_BROWSERLESS_FALLBACK_TO_HTTP: z.string().optional(),
+  CLAWRUBBER_BROWSERLESS_BLOCK_ADS: z.string().optional(),
 });
 
 function toBoolean(input: string | undefined, defaultValue: boolean): boolean {
@@ -128,28 +152,40 @@ function parseDomainList(input: string | undefined): string[] {
 
 export function loadConfig(env = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
-  const profileSettings = profiles[parsed.CR_PROFILE];
+  const profileSettings = profiles[parsed.CLAWRUBBER_PROFILE];
+  const maxHtmlBytes = toInteger(parsed.CLAWRUBBER_BROWSERLESS_MAX_HTML_BYTES, 1_500_000);
 
   return {
     port: toInteger(parsed.PORT, 3000),
     host: parsed.HOST ?? "0.0.0.0",
-    braveApiKey: parsed.BRAVE_API_KEY,
-    braveApiBaseUrl: parsed.CR_BRAVE_API_BASE_URL,
-    profile: parsed.CR_PROFILE,
+    braveApiKey: parsed.CLAWRUBBER_BRAVE_API_KEY,
+    braveApiBaseUrl: parsed.CLAWRUBBER_BRAVE_API_BASE_URL,
+    profile: parsed.CLAWRUBBER_PROFILE,
     profileSettings,
-    redactedUrls: toBoolean(parsed.CR_REDACT_URLS, true),
-    failClosed: toBoolean(parsed.CR_FAIL_CLOSED, true),
-    allowlistDomains: parseDomainList(parsed.CR_ALLOWLIST_DOMAINS),
-    blocklistDomains: parseDomainList(parsed.CR_BLOCKLIST_DOMAINS),
-    dbPath: parsed.CR_DB_PATH,
-    logDir: parsed.CR_LOG_DIR,
-    resultTtlMs: toInteger(parsed.CR_RESULT_TTL_MINUTES, 30) * 60 * 1000,
-    retentionDays: toInteger(parsed.CR_RETENTION_DAYS, 30),
-    llmJudgeEnabled: toBoolean(parsed.CR_LLM_JUDGE_ENABLED, false),
-    llmProvider: parsed.CR_LLM_PROVIDER,
-    llmModel: parsed.CR_LLM_MODEL,
-    openaiApiKey: parsed.OPENAI_API_KEY,
-    ollamaBaseUrl: parsed.OLLAMA_BASE_URL,
-    userAgent: parsed.CR_USER_AGENT,
+    redactedUrls: toBoolean(parsed.CLAWRUBBER_REDACT_URLS, true),
+    failClosed: toBoolean(parsed.CLAWRUBBER_FAIL_CLOSED, true),
+    allowlistDomains: parseDomainList(parsed.CLAWRUBBER_ALLOWLIST_DOMAINS),
+    blocklistDomains: parseDomainList(parsed.CLAWRUBBER_BLOCKLIST_DOMAINS),
+    dbPath: parsed.CLAWRUBBER_DB_PATH,
+    logDir: parsed.CLAWRUBBER_LOG_DIR,
+    resultTtlMs: toInteger(parsed.CLAWRUBBER_RESULT_TTL_MINUTES, 30) * 60 * 1000,
+    retentionDays: toInteger(parsed.CLAWRUBBER_RETENTION_DAYS, 30),
+    llmJudgeEnabled: toBoolean(parsed.CLAWRUBBER_LLM_JUDGE_ENABLED, false),
+    llmProvider: parsed.CLAWRUBBER_LLM_PROVIDER,
+    llmModel: parsed.CLAWRUBBER_LLM_MODEL,
+    openaiApiKey: parsed.CLAWRUBBER_OPENAI_API_KEY,
+    ollamaBaseUrl: parsed.CLAWRUBBER_OLLAMA_BASE_URL,
+    userAgent: parsed.CLAWRUBBER_USER_AGENT,
+    websiteRendererBackend: parsed.CLAWRUBBER_WEBSITE_RENDERER_BACKEND,
+    browserless: {
+      baseUrl: parsed.CLAWRUBBER_BROWSERLESS_URL,
+      token: parsed.CLAWRUBBER_BROWSERLESS_TOKEN,
+      timeoutMs: toInteger(parsed.CLAWRUBBER_BROWSERLESS_TIMEOUT_MS, 12_000),
+      waitUntil: parsed.CLAWRUBBER_BROWSERLESS_WAIT_UNTIL,
+      waitForSelector: parsed.CLAWRUBBER_BROWSERLESS_WAIT_FOR_SELECTOR.trim(),
+      maxHtmlBytes: maxHtmlBytes > 0 ? maxHtmlBytes : 1_500_000,
+      fallbackToHttp: toBoolean(parsed.CLAWRUBBER_BROWSERLESS_FALLBACK_TO_HTTP, true),
+      blockAds: toBoolean(parsed.CLAWRUBBER_BROWSERLESS_BLOCK_ADS, true),
+    },
   };
 }

@@ -60,7 +60,7 @@ export class LlmJudge {
     }
 
     if (!this.config.openaiApiKey) {
-      throw new Error("OPENAI_API_KEY required when CR_LLM_PROVIDER=openai");
+      throw new Error("CLAWRUBBER_OPENAI_API_KEY required when CLAWRUBBER_LLM_PROVIDER=openai");
     }
 
     const provider = createOpenAI({

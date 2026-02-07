@@ -22,7 +22,7 @@ export class BraveClient {
 
   async webSearch(request: BraveWebSearchRequest): Promise<{ raw: unknown; results: BraveWebResult[] }> {
     if (!this.config.braveApiKey) {
-      throw new Error("BRAVE_API_KEY is not configured");
+      throw new Error("CLAWRUBBER_BRAVE_API_KEY is not configured");
     }
 
     const query = new URLSearchParams({
