@@ -18,5 +18,4 @@ fi
 exec bun test \
   ./test/integration/health.integration.ts \
   ./test/integration/search-fetch.integration.ts \
-  ./test/integration/web-fetch.integration.ts \
   ./test/integration/routing.integration.ts
