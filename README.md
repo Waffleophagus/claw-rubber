@@ -94,11 +94,13 @@ docker run --rm -p 3000:3000 -e CLAWRUBBER_BRAVE_API_KEY=... claw-rubber
 `docker-compose.yml` includes:
 - `claw-rubber` service (always)
 - `browserless` service (optional profile: `browserless`)
+- `claw-rubber` image default: `ghcr.io/waffleophagus/claw-rubber:main`
 
 Run claw-rubber only (plain HTTP fetch):
 ```bash
 export CLAWRUBBER_BRAVE_API_KEY="..."
-docker compose up --build
+docker compose pull
+docker compose up -d
 ```
 
 Run claw-rubber + Browserless rendering:
@@ -106,8 +108,11 @@ Run claw-rubber + Browserless rendering:
 export CLAWRUBBER_BRAVE_API_KEY="..."
 export CLAWRUBBER_WEBSITE_RENDERER_BACKEND="browserless"
 export CLAWRUBBER_BROWSERLESS_URL="http://browserless:3000"
-docker compose --profile browserless up --build
+docker compose --profile browserless pull
+docker compose --profile browserless up -d
 ```
 
 Optional local Browserless debug port:
 - Browserless is exposed on `http://localhost:3001` by default (`BROWSERLESS_HOST_PORT` to override).
+- Override app image/tag with `CLAWRUBBER_IMAGE` in `.env` if needed.
+- If GHCR denies pulls, run: `docker login ghcr.io`.

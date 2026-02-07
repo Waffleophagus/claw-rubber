@@ -1,9 +1,7 @@
 services:
   claw-rubber:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: claw-rubber:local
+    image: ${CLAWRUBBER_IMAGE:-ghcr.io/waffleophagus/claw-rubber:main}
+    pull_policy: always
     container_name: claw-rubber
     restart: unless-stopped
     ports:
