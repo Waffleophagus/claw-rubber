@@ -66,10 +66,11 @@ export async function processFetchedPage(
 ): Promise<ProcessedFetch> {
   const traceKind = classifyTraceKind(input.traceKind, input.searchContext)
   const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains)
+  const effectiveBlocklist = ctx.db.getEffectiveBlocklist(ctx.config.blocklistDomains)
   const domainPolicy = evaluateDomainPolicy(
     input.domain,
     effectiveAllowlist,
-    ctx.config.blocklistDomains,
+    effectiveBlocklist,
   )
   if (domainPolicy.action === "block") {
     ctx.db.storeFetchEvent({
@@ -133,7 +134,7 @@ export async function processFetchedPage(
   const finalDomainPolicy = evaluateDomainPolicy(
     finalDomain,
     effectiveAllowlist,
-    ctx.config.blocklistDomains,
+    effectiveBlocklist,
   )
   if (finalDomainPolicy.action === "block") {
     const reason = `Redirected final URL blocked: ${finalDomainPolicy.reason ?? "Domain blocked"}`

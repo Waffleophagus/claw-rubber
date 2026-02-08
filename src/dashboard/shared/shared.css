@@ -32,6 +32,7 @@ body {
 .trace-filters,
 .trace-layout,
 .trace-footer,
+.trace-notice,
 .trace-error {
   width: min(1440px, 100%);
   margin: 0 auto;
@@ -164,6 +165,14 @@ body {
   border: 1px solid color-mix(in srgb, var(--trace-danger, #be123c) 45%, transparent);
   background: color-mix(in srgb, var(--trace-danger, #be123c) 15%, white);
   color: color-mix(in srgb, var(--trace-danger, #be123c) 80%, black);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.trace-notice {
+  border: 1px solid color-mix(in srgb, var(--trace-accent, #0f766e) 45%, transparent);
+  background: color-mix(in srgb, var(--trace-accent, #0f766e) 13%, white);
+  color: color-mix(in srgb, var(--trace-accent, #0f766e) 78%, black);
   border-radius: 0.75rem;
   padding: 0.7rem 0.9rem;
 }
@@ -613,6 +622,23 @@ body {
   vertical-align: top;
 }
 
+.trace-table th:last-child,
+.trace-table td:last-child {
+  width: 8.4rem;
+}
+
+.trace-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.64rem;
+  color: color-mix(in srgb, var(--trace-muted, #475569) 85%, transparent);
+  background: color-mix(in srgb, var(--trace-panel-strong, #fff) 82%, transparent);
+  backdrop-filter: blur(4px);
+}
+
 .trace-table tbody tr {
   cursor: pointer;
   transition: background-color 140ms ease;
@@ -630,28 +656,83 @@ body {
   font-weight: 700;
 }
 
+.trace-inline-action {
+  min-height: 1.95rem;
+  min-width: 6.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0.34rem 0.58rem;
+  white-space: nowrap;
+  border-width: 1px;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
+  line-height: 1;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.trace-inline-action-icon {
+  flex: 0 0 auto;
+}
+
+.trace-inline-action-label {
+  display: inline-block;
+  -webkit-text-fill-color: currentColor;
+}
+
+.trace-inline-action:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.24);
+}
+
+.trace-inline-action.to-allowlist {
+  background: linear-gradient(145deg, #14b8a6, #0f766e);
+  border-color: color-mix(in srgb, #14b8a6 60%, #0f172a);
+  color: #ecfeff;
+  text-shadow: 0 1px 0 rgba(6, 78, 59, 0.45);
+}
+
+.trace-inline-action.to-blocklist {
+  background: linear-gradient(145deg, #fb7185, #e11d48);
+  border-color: color-mix(in srgb, #fb7185 58%, #0f172a);
+  color: #fff1f2;
+  text-shadow: 0 1px 0 rgba(136, 19, 55, 0.5);
+}
+
 .trace-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  font-size: 0.67rem;
-  padding: 0.2rem 0.45rem;
+  min-height: 1.72rem;
+  border: 1px solid transparent;
+  font-size: 0.66rem;
+  padding: 0.24rem 0.58rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.045em;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1;
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.12);
 }
 
 .trace-pill.success {
-  background: color-mix(in srgb, #10b981 18%, white);
-  color: #065f46;
+  background: linear-gradient(145deg, #1ba99a, #0f766e);
+  border-color: color-mix(in srgb, #1ba99a 50%, #0f172a);
+  color: #e7fffb;
+  text-shadow: 0 1px 0 rgba(6, 78, 59, 0.35);
 }
 
 .trace-pill.danger {
-  background: color-mix(in srgb, #e11d48 18%, white);
-  color: #9f1239;
+  background: linear-gradient(145deg, #f56f86, #d7375b);
+  border-color: color-mix(in srgb, #f56f86 50%, #0f172a);
+  color: #fff4f6;
+  text-shadow: 0 1px 0 rgba(136, 19, 55, 0.38);
 }
 
 .trace-card-grid {
@@ -812,6 +893,11 @@ body {
 .trace-detail-field .mono {
   font-family: var(--trace-font-mono);
   font-size: 0.79rem;
+}
+
+.trace-detail-actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .trace-evidence,

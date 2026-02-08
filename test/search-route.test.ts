@@ -18,6 +18,7 @@ test("search route returns 503 when brave queue is full", async () => {
     config: loadConfig({ CLAWRUBBER_BRAVE_API_KEY: "test-key" }),
     db: {
       getEffectiveAllowlist: () => [],
+      getEffectiveBlocklist: () => [],
     },
     loggers: {
       app: {

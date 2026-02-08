@@ -22,6 +22,7 @@ import "react-day-picker/style.css"
 
 export type DashboardVariant = "v1" | "v2" | "v3" | "v4" | "v5"
 type SignalForgeThemeMode = "system" | "light" | "dark"
+type DomainListAction = "allowlist" | "blocklist"
 
 interface TraceEvent {
   eventId: string
@@ -245,6 +246,11 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
   const [isLoading, setIsLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [pendingDomainAction, setPendingDomainAction] = useState<{
+    domain: string
+    target: DomainListAction
+  } | null>(null)
 
   const limit = 50
   const copy = VARIANT_COPY[variant]
@@ -397,6 +403,59 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
     setFilters((current) => ({ ...current, [key]: value }))
   }
 
+  async function addDomainToList(event: Pick<TraceEvent, "domain" | "decision">): Promise<void> {
+    const action = domainActionForDecision(event.decision)
+    const actionLabel = action.target === "allowlist" ? "runtime allowlist" : "runtime blocklist"
+
+    if (
+      typeof globalThis.confirm === "function" &&
+      !globalThis.confirm(`Add "${event.domain}" to ${actionLabel} now?`)
+    ) {
+      return
+    }
+
+    let note: string | undefined
+    if (typeof globalThis.prompt === "function") {
+      const raw = globalThis.prompt("Optional investigator note:")
+      if (raw === null) {
+        return
+      }
+      note = raw.trim() || undefined
+    }
+
+    setPendingDomainAction({ domain: event.domain, target: action.target })
+    setNotice(null)
+    setError(null)
+
+    try {
+      await fetchJson(`/v1/dashboard/${action.target}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          domain: event.domain,
+          note,
+        }),
+      })
+
+      setNotice(
+        action.target === "allowlist"
+          ? `Added ${event.domain} to runtime allowlist.`
+          : `Added ${event.domain} to runtime blocklist.`,
+      )
+
+      void load()
+      if (selectedId) {
+        void loadDetail(selectedId)
+      }
+    } catch (actionError) {
+      const message =
+        actionError instanceof Error ? actionError.message : "Failed to update domain policy list"
+      setError(message)
+    } finally {
+      setPendingDomainAction(null)
+    }
+  }
+
   const pageStart = totalEvents === 0 ? 0 : offset + 1
   const pageEnd = Math.min(offset + limit, totalEvents)
 
@@ -473,6 +532,7 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
         </div>
       </header>
 
+      {notice ? <div className="trace-notice">{notice}</div> : null}
       {error ? <div className="trace-error">{error}</div> : null}
 
       <section className="trace-metrics">
@@ -664,6 +724,8 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
             events={events}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onDomainAction={(event) => void addDomainToList(event)}
+            pendingDomainAction={pendingDomainAction}
           />
           <div className="trace-pagination">
             <button
@@ -724,7 +786,13 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
             </div>
             {detailLoading ? <p>Loading trace...</p> : null}
             {!detailLoading && !detail ? <p>Trace details unavailable.</p> : null}
-            {detail ? <TraceDetail detail={detail} /> : null}
+            {detail ? (
+              <TraceDetail
+                detail={detail}
+                onDomainAction={(event) => void addDomainToList(event)}
+                pendingDomainAction={pendingDomainAction}
+              />
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -849,11 +917,15 @@ function TraceStream({
   events,
   selectedId,
   onSelect,
+  onDomainAction,
+  pendingDomainAction,
 }: {
   variant: DashboardVariant
   events: TraceEvent[]
   selectedId: string | null
   onSelect: (eventId: string) => void
+  onDomainAction: (event: Pick<TraceEvent, "domain" | "decision">) => void
+  pendingDomainAction: { domain: string; target: DomainListAction } | null
 }) {
   if (events.length === 0) {
     return (
@@ -907,6 +979,7 @@ function TraceStream({
             <th>Allowed by</th>
             <th>Query</th>
             <th>Reason</th>
+            <th>Quick action</th>
           </tr>
         </thead>
         <tbody>
@@ -933,6 +1006,13 @@ function TraceStream({
               <td data-label="Reason" className="trace-cell-text">
                 {event.reason ?? "--"}
               </td>
+              <td data-label="Quick action">
+                <TraceDomainActionButton
+                  event={event}
+                  pendingDomainAction={pendingDomainAction}
+                  onClick={() => onDomainAction(event)}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -941,7 +1021,15 @@ function TraceStream({
   )
 }
 
-function TraceDetail({ detail }: { detail: TraceEventDetail }) {
+function TraceDetail({
+  detail,
+  onDomainAction,
+  pendingDomainAction,
+}: {
+  detail: TraceEventDetail
+  onDomainAction: (event: Pick<TraceEvent, "domain" | "decision">) => void
+  pendingDomainAction: { domain: string; target: DomainListAction } | null
+}) {
   return (
     <div className="trace-detail-grid">
       <DetailField label="Event" value={detail.eventId} mono />
@@ -959,6 +1047,13 @@ function TraceDetail({ detail }: { detail: TraceEventDetail }) {
       <DetailField label="Query" value={detail.query ?? "--"} />
       <DetailField label="Reason" value={detail.reason ?? "--"} />
       <DetailField label="Flags" value={detail.flags.join(", ") || "--"} mono />
+      <div className="trace-detail-actions">
+        <TraceDomainActionButton
+          event={detail}
+          pendingDomainAction={pendingDomainAction}
+          onClick={() => onDomainAction(detail)}
+        />
+      </div>
       {detail.evidence.length > 0 ? (
         <div className="trace-evidence">
           <h4>Evidence</h4>
@@ -1039,6 +1134,41 @@ function StatusPill({ event }: { event: TraceEvent }) {
         ? humanBlockedBy(event.blockedBy)
         : humanAllowedBy(event.allowedBy)}
     </span>
+  )
+}
+
+function TraceDomainActionButton({
+  event,
+  pendingDomainAction,
+  onClick,
+}: {
+  event: Pick<TraceEvent, "domain" | "decision">
+  pendingDomainAction: { domain: string; target: DomainListAction } | null
+  onClick: () => void
+}) {
+  const action = domainActionForDecision(event.decision)
+  const isPending =
+    pendingDomainAction?.domain === event.domain && pendingDomainAction.target === action.target
+
+  return (
+    <button
+      type="button"
+      className={`trace-btn subtle trace-inline-action ${action.target === "allowlist" ? "to-allowlist" : "to-blocklist"}`}
+      disabled={isPending}
+      title={action.tooltip}
+      aria-label={action.tooltip}
+      onClick={(eventObj) => {
+        eventObj.stopPropagation()
+        onClick()
+      }}
+    >
+      {action.target === "allowlist" ? (
+        <ShieldCheck size={12} className="trace-inline-action-icon" />
+      ) : (
+        <ShieldAlert size={12} className="trace-inline-action-icon" />
+      )}
+      <span className="trace-inline-action-label">{isPending ? "Adding..." : action.buttonText}</span>
+    </button>
   )
 }
 
@@ -1137,6 +1267,24 @@ function formatScore(event: TraceEvent): string {
     return String(event.score)
   }
   return `${event.score}/${event.blockThreshold}`
+}
+
+function domainActionForDecision(
+  decision: "allow" | "block",
+): { target: DomainListAction; buttonText: string; tooltip: string } {
+  if (decision === "block") {
+    return {
+      target: "allowlist",
+      buttonText: "Allow +",
+      tooltip: "Add blocked domain to runtime allowlist",
+    }
+  }
+
+  return {
+    target: "blocklist",
+    buttonText: "Block +",
+    tooltip: "Add allowed domain to runtime blocklist",
+  }
 }
 
 function toDatetimeLocalValue(date: Date): string {

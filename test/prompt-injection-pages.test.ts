@@ -63,6 +63,7 @@ function makeContext(config: AppConfig, body: string): ServerContext {
     db: {
       getSearchResult: () => null,
       getEffectiveAllowlist: () => [],
+      getEffectiveBlocklist: () => [],
       storeFetchEvent: () => 1,
       storeFlaggedPayload: () => {},
     },

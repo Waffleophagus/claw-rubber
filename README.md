@@ -78,6 +78,8 @@ Then set required secrets such as `CLAWRUBBER_BRAVE_API_KEY`.
 - `GET /v1/dashboard/top-allowed-by`
 - `GET /v1/dashboard/allowlist`
 - `POST /v1/dashboard/allowlist`
+- `GET /v1/dashboard/blocklist`
+- `POST /v1/dashboard/blocklist`
 
 ## Investigator Dashboard
 The dashboard is designed for human false-positive investigation and policy tuning:
@@ -85,7 +87,7 @@ The dashboard is designed for human false-positive investigation and policy tuni
 - Track allow-path exceptions (`allowedBy`) such as domain allowlist bypass and language exceptions
 - Review blocked fetch events and search domain blocks
 - Open event details including stored flagged payload content
-- Add domains to runtime allowlist without restarting the service
+- Add domains to runtime allowlist/blocklist without restarting the service
 
 Open:
 ```bash
@@ -102,11 +104,12 @@ Optional seeding flags:
 - `--fetch-events 200` to increase synthetic fetch traces
 - `--search-blocks 40` to increase synthetic search-block traces
 
-Runtime allowlist behavior:
+Runtime domain policy behavior:
 - Added domains are persisted in SQLite and applied immediately.
 - Blocklist still has highest precedence (blocklist always wins).
 - Environment allowlist (`CLAWRUBBER_ALLOWLIST_DOMAINS`) remains active and is merged with runtime entries.
-- `POST /v1/dashboard/allowlist` is enabled by default; set
+- Environment blocklist (`CLAWRUBBER_BLOCKLIST_DOMAINS`) remains active and is merged with runtime entries.
+- `POST /v1/dashboard/allowlist` and `POST /v1/dashboard/blocklist` are enabled by default; set
   `CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API=false` when exposed outside trusted networks.
 
 ## Security Hardening

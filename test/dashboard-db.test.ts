@@ -157,6 +157,27 @@ describe("dashboard db", () => {
     }
   })
 
+  test("runtime blocklist merges with static blocklist", () => {
+    const { db, path } = createDb()
+    try {
+      db.addRuntimeBlocklistDomain("*.evil.example", "investigator block")
+      db.addRuntimeBlocklistDomain("ads.example")
+      expect(() => db.addRuntimeBlocklistDomain("$$$")).toThrow("Invalid domain")
+
+      const runtime = db.listRuntimeBlocklistDomains()
+      expect(runtime.length).toBe(2)
+      expect(runtime[0]?.domain).toBe("ads.example")
+      expect(runtime[1]?.domain).toBe("evil.example")
+
+      const effective = db.getEffectiveBlocklist(["malware.example", "evil.example"])
+      expect(effective.includes("malware.example")).toBe(true)
+      expect(effective.includes("evil.example")).toBe(true)
+      expect(effective.includes("ads.example")).toBe(true)
+    } finally {
+      cleanupDb(path)
+    }
+  })
+
   test("fetch event detail returns payload and triage metadata", () => {
     const { db, path } = createDb()
     try {

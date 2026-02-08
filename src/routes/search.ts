@@ -28,6 +28,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
 
   try {
     const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains)
+    const effectiveBlocklist = ctx.db.getEffectiveBlocklist(ctx.config.blocklistDomains)
     const brave = await ctx.braveClient.webSearch({
       query: body.query,
       count: body.count,
@@ -46,7 +47,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
       const domainPolicy = evaluateDomainPolicy(
         domain,
         effectiveAllowlist,
-        ctx.config.blocklistDomains,
+        effectiveBlocklist,
       )
 
       return {

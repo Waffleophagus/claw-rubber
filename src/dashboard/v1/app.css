@@ -36,6 +36,7 @@
 .trace-dashboard-v1 .trace-filters,
 .trace-dashboard-v1 .trace-layout,
 .trace-dashboard-v1 .trace-footer,
+.trace-dashboard-v1 .trace-notice,
 .trace-dashboard-v1 .trace-error {
   width: min(1360px, 100%);
   position: relative;
@@ -232,11 +233,15 @@
 }
 
 .trace-dashboard-v1.trace-theme-dark .trace-pill.success {
-  background: rgba(16, 185, 129, 0.2);
-  color: #6ee7b7;
+  background: linear-gradient(145deg, #27c2ae, #0f766e);
+  border-color: color-mix(in srgb, #27c2ae 54%, #0f172a);
+  color: #e7fffb;
+  box-shadow: 0 8px 14px rgba(13, 148, 136, 0.24);
 }
 
 .trace-dashboard-v1.trace-theme-dark .trace-pill.danger {
-  background: rgba(244, 63, 94, 0.22);
-  color: #fda4af;
+  background: linear-gradient(145deg, #f47486, #cc3558);
+  border-color: color-mix(in srgb, #f47486 54%, #0f172a);
+  color: #fff4f6;
+  box-shadow: 0 8px 14px rgba(225, 29, 72, 0.24);
 }

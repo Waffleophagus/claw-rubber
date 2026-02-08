@@ -130,6 +130,12 @@ export interface RuntimeAllowlistDomain {
   addedAt: number
 }
 
+export interface RuntimeBlocklistDomain {
+  domain: string
+  note: string | null
+  addedAt: number
+}
+
 interface DashboardEventRow {
   event_id: string
   source: DashboardSource
@@ -241,6 +247,12 @@ export class AppDb {
       );
 
       CREATE TABLE IF NOT EXISTS runtime_allowlist_domains (
+        domain TEXT PRIMARY KEY,
+        note TEXT,
+        added_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS runtime_blocklist_domains (
         domain TEXT PRIMARY KEY,
         note TEXT,
         added_at INTEGER NOT NULL
@@ -502,6 +514,54 @@ export class AppDb {
   getEffectiveAllowlist(staticAllowlist: string[]): string[] {
     const combined = new Set<string>(staticAllowlist.map((domain) => normalizeDomain(domain)))
     for (const runtime of this.listRuntimeAllowlistDomains()) {
+      combined.add(runtime.domain)
+    }
+    return [...combined]
+  }
+
+  addRuntimeBlocklistDomain(domain: string, note?: string): RuntimeBlocklistDomain {
+    const normalized = normalizeDomain(domain).replace(/^\*\./, "")
+    if (!isValidDomainEntry(normalized)) {
+      throw new Error("Invalid domain")
+    }
+
+    const addedAt = Date.now()
+    const trimmedNote = note?.trim() ? note.trim() : null
+    const stmt = this.db.prepare(
+      `
+        INSERT INTO runtime_blocklist_domains (domain, note, added_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(domain) DO UPDATE SET
+          note = excluded.note,
+          added_at = excluded.added_at
+      `,
+    )
+
+    stmt.run(normalized, trimmedNote, addedAt)
+    return { domain: normalized, note: trimmedNote, addedAt }
+  }
+
+  listRuntimeBlocklistDomains(): RuntimeBlocklistDomain[] {
+    const rows = this.db
+      .prepare(
+        `
+          SELECT domain, note, added_at
+          FROM runtime_blocklist_domains
+          ORDER BY domain ASC
+        `,
+      )
+      .all() as Array<{ domain: string; note: string | null; added_at: number }>
+
+    return rows.map((row) => ({
+      domain: row.domain,
+      note: row.note,
+      addedAt: row.added_at,
+    }))
+  }
+
+  getEffectiveBlocklist(staticBlocklist: string[]): string[] {
+    const combined = new Set<string>(staticBlocklist.map((domain) => normalizeDomain(domain)))
+    for (const runtime of this.listRuntimeBlocklistDomains()) {
       combined.add(runtime.domain)
     }
     return [...combined]

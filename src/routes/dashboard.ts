@@ -7,6 +7,11 @@ const AllowlistRequestSchema = z.object({
   note: z.string().max(2000).optional(),
 })
 
+const BlocklistRequestSchema = z.object({
+  domain: z.string().min(1).max(255),
+  note: z.string().max(2000).optional(),
+})
+
 interface DashboardFilters {
   from: number
   to: number
@@ -35,6 +40,21 @@ export async function handleDashboardAllowlistGet(
     runtimeAllowlist,
     effectiveAllowlist,
     blocklistPrecedence: true,
+  })
+}
+
+export async function handleDashboardBlocklistGet(
+  _request: Request,
+  ctx: ServerContext,
+): Promise<Response> {
+  const runtimeBlocklist = ctx.db.listRuntimeBlocklistDomains()
+  const envBlocklist = [...ctx.config.blocklistDomains]
+  const effectiveBlocklist = ctx.db.getEffectiveBlocklist(ctx.config.blocklistDomains)
+
+  return jsonResponse({
+    envBlocklist,
+    runtimeBlocklist,
+    effectiveBlocklist,
   })
 }
 
@@ -70,6 +90,40 @@ export async function handleDashboardAllowlistPost(
     entry,
     effectiveAllowlist,
     blocklistPrecedence: true,
+  })
+}
+
+export async function handleDashboardBlocklistPost(
+  request: Request,
+  ctx: ServerContext,
+): Promise<Response> {
+  if (!ctx.config.enableDashboardWriteApi) {
+    return errorResponse(403, "Dashboard write API is disabled", {
+      hint: "Set CLAWRUBBER_ENABLE_DASHBOARD_WRITE_API=true to enable runtime blocklist changes",
+    })
+  }
+
+  const payload = await readJsonBody(request)
+  const parsed = BlocklistRequestSchema.safeParse(payload)
+  if (!parsed.success) {
+    return errorResponse(400, "Invalid blocklist payload", parsed.error.flatten())
+  }
+
+  let entry
+  try {
+    entry = ctx.db.addRuntimeBlocklistDomain(parsed.data.domain, parsed.data.note)
+  } catch (error) {
+    return errorResponse(400, "Invalid blocklist domain", {
+      domain: parsed.data.domain,
+      message: error instanceof Error ? error.message : "Invalid domain",
+    })
+  }
+
+  const effectiveBlocklist = ctx.db.getEffectiveBlocklist(ctx.config.blocklistDomains)
+
+  return jsonResponse({
+    entry,
+    effectiveBlocklist,
   })
 }
 

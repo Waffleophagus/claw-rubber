@@ -90,6 +90,7 @@ function makeContext({
         expiresAt: Date.now() + 60_000,
       }),
       getEffectiveAllowlist: () => [],
+      getEffectiveBlocklist: (blocklist: string[]) => [...blocklist],
       storeFetchEvent: () => "fetch-event-1",
       storeFlaggedPayload: () => {},
     },

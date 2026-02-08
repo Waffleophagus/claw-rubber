@@ -5,6 +5,8 @@ import { createLoggers } from "./logger"
 import {
   handleDashboardAllowlistGet,
   handleDashboardAllowlistPost,
+  handleDashboardBlocklistGet,
+  handleDashboardBlocklistPost,
   handleDashboardEventDetail,
   handleDashboardEvents,
   handleDashboardOverview,
@@ -149,6 +151,14 @@ const server = Bun.serve({
         response = await handleDashboardAllowlistGet(request, ctx)
       } else if (request.method === "POST") {
         response = await handleDashboardAllowlistPost(request, ctx)
+      } else {
+        response = errorResponse(405, "Method not allowed")
+      }
+    } else if (pathname === "/v1/dashboard/blocklist") {
+      if (request.method === "GET") {
+        response = await handleDashboardBlocklistGet(request, ctx)
+      } else if (request.method === "POST") {
+        response = await handleDashboardBlocklistPost(request, ctx)
       } else {
         response = errorResponse(405, "Method not allowed")
       }

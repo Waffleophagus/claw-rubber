@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { AppConfig } from "../src/config"
-import { handleDashboardAllowlistPost } from "../src/routes/dashboard"
+import { handleDashboardAllowlistPost, handleDashboardBlocklistPost } from "../src/routes/dashboard"
 import type { ServerContext } from "../src/server-context"
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -67,6 +67,12 @@ function makeContext(config: AppConfig): ServerContext {
         addedAt: Date.now(),
       }),
       getEffectiveAllowlist: (allowlist: string[]) => [...allowlist, "docs.bun.sh"],
+      addRuntimeBlocklistDomain: (domain: string, note?: string) => ({
+        domain,
+        note: note ?? null,
+        addedAt: Date.now(),
+      }),
+      getEffectiveBlocklist: (blocklist: string[]) => [...blocklist, "evil.example"],
     },
   } as unknown as ServerContext
 }
@@ -102,5 +108,39 @@ describe("dashboard allowlist write gate", () => {
     }
     expect(payload.entry?.domain).toBe("docs.bun.sh")
     expect(payload.effectiveAllowlist?.includes("docs.bun.sh")).toBe(true)
+  })
+})
+
+describe("dashboard blocklist write gate", () => {
+  test("rejects writes when disabled", async () => {
+    const response = await handleDashboardBlocklistPost(
+      new Request("http://localhost/v1/dashboard/blocklist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ domain: "evil.example" }),
+      }),
+      makeContext(makeConfig({ enableDashboardWriteApi: false })),
+    )
+
+    expect(response.status).toBe(403)
+  })
+
+  test("allows writes when enabled", async () => {
+    const response = await handleDashboardBlocklistPost(
+      new Request("http://localhost/v1/dashboard/blocklist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ domain: "evil.example" }),
+      }),
+      makeContext(makeConfig({ enableDashboardWriteApi: true })),
+    )
+
+    expect(response.status).toBe(200)
+    const payload = (await response.json()) as {
+      effectiveBlocklist?: string[]
+      entry?: { domain?: string }
+    }
+    expect(payload.entry?.domain).toBe("evil.example")
+    expect(payload.effectiveBlocklist?.includes("evil.example")).toBe(true)
   })
 })
