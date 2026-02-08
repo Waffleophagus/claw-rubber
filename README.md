@@ -1,5 +1,13 @@
 # claw-rubber
 
+<p align="center">
+  <img src="rubber-logo.png" alt="Rubber logo" width="260" />
+</p>
+<p align="center">
+  <strong>Rubber</strong><br />
+  <em>The protection you need.</em>
+</p>
+
 A Bun-based secure proxy for OpenClaw web access via Brave Search.
 
 ## Features

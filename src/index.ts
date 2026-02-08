@@ -34,6 +34,7 @@ const db = new AppDb(config.dbPath)
 const braveClient = new BraveClient(config)
 const contentFetcher = new ContentFetcher(config)
 const llmJudge = new LlmJudge(config, loggers.app)
+const dashboardFavicon = Bun.file(new URL("./dashboard/v1/favicon.ico", import.meta.url))
 
 const ctx: ServerContext = {
   config,
@@ -70,7 +71,18 @@ const server = Bun.serve({
 
     let response: Response
 
-    if (pathname === "/healthz") {
+    if (
+      pathname === "/favicon.ico" ||
+      pathname === "/dashboard/favicon.ico" ||
+      pathname === "/dashboard/v1/favicon.ico"
+    ) {
+      response = new Response(dashboardFavicon, {
+        headers: {
+          "content-type": "image/x-icon",
+          "cache-control": "public, max-age=604800, immutable",
+        },
+      })
+    } else if (pathname === "/healthz") {
       response = handleHealthz(request, ctx)
     } else if (pathname === "/readyz") {
       response = handleReadyz(request, ctx)

@@ -1066,12 +1066,15 @@ function TraceDetail({
         <div className="trace-evidence">
           <h4>Evidence</h4>
           {detail.evidence.map((item) => (
-            <article key={item.id}>
-              <p>
-                <strong>{item.flag}</strong> via {item.detector} ({item.basis}) • weight{" "}
-                {item.weight}
+            <article key={item.id} className="trace-evidence-item">
+              <p className="trace-evidence-meta">
+                <strong>{item.flag}</strong>
+                <span>
+                  via {item.detector} ({item.basis})
+                </span>
+                <span className="trace-evidence-weight">weight {item.weight}</span>
               </p>
-              <code>{item.excerpt || item.matchedText || "--"}</code>
+              <code className="trace-evidence-snippet">{item.excerpt || item.matchedText || "--"}</code>
             </article>
           ))}
         </div>
@@ -1233,7 +1236,7 @@ function humanBlockedBy(value: string | null): string {
     case "llm-judge":
       return "LLM judge"
     case "fail-closed":
-      return "Fail closed"
+      return "Rule threshold"
     case "policy":
       return "Policy"
     default:
