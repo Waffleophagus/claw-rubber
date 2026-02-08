@@ -107,9 +107,9 @@ interface FlagFilterPreset {
 
 const VARIANT_COPY: Record<DashboardVariant, { title: string; subtitle: string; tone: string }> = {
   v1: {
-    title: "Signal Forge",
-    subtitle: "Dense analyst cockpit for full fetch trace triage",
-    tone: "Operational",
+    title: "Rubber",
+    subtitle: "Welcome to your dashboard",
+    tone: "Your Openclaw is protected with",
   },
   v2: {
     title: "Atlas Sweep",
@@ -482,7 +482,7 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
     >
       <header className="trace-hero">
         <div>
-          <p className="trace-hero-kicker">{copy.tone} Trace Model</p>
+          <p className="trace-hero-kicker">{copy.tone}</p>
           <h1>{copy.title}</h1>
           <p>{copy.subtitle}</p>
         </div>
