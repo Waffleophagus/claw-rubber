@@ -32,7 +32,6 @@ body {
 .trace-filters,
 .trace-layout,
 .trace-footer,
-.trace-notice,
 .trace-error {
   width: min(1440px, 100%);
   margin: 0 auto;
@@ -165,14 +164,6 @@ body {
   border: 1px solid color-mix(in srgb, var(--trace-danger, #be123c) 45%, transparent);
   background: color-mix(in srgb, var(--trace-danger, #be123c) 15%, white);
   color: color-mix(in srgb, var(--trace-danger, #be123c) 80%, black);
-  border-radius: 0.75rem;
-  padding: 0.7rem 0.9rem;
-}
-
-.trace-notice {
-  border: 1px solid color-mix(in srgb, var(--trace-accent, #0f766e) 45%, transparent);
-  background: color-mix(in srgb, var(--trace-accent, #0f766e) 13%, white);
-  color: color-mix(in srgb, var(--trace-accent, #0f766e) 78%, black);
   border-radius: 0.75rem;
   padding: 0.7rem 0.9rem;
 }

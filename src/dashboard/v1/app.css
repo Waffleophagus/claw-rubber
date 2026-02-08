@@ -36,7 +36,6 @@
 .trace-dashboard-v1 .trace-filters,
 .trace-dashboard-v1 .trace-layout,
 .trace-dashboard-v1 .trace-footer,
-.trace-dashboard-v1 .trace-notice,
 .trace-dashboard-v1 .trace-error {
   width: min(1360px, 100%);
   position: relative;

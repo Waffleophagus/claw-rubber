@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import * as Popover from "@radix-ui/react-popover"
 import * as ToggleGroup from "@radix-ui/react-toggle-group"
 import { DayPicker } from "react-day-picker"
+import { Toaster, toast } from "sonner"
 import "react-day-picker/style.css"
 
 export type DashboardVariant = "v1" | "v2" | "v3" | "v4" | "v5"
@@ -246,7 +247,6 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
   const [isLoading, setIsLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [pendingDomainAction, setPendingDomainAction] = useState<{
     domain: string
     target: DomainListAction
@@ -424,7 +424,6 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
     }
 
     setPendingDomainAction({ domain: event.domain, target: action.target })
-    setNotice(null)
     setError(null)
 
     try {
@@ -437,11 +436,11 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
         }),
       })
 
-      setNotice(
-        action.target === "allowlist"
-          ? `Added ${event.domain} to runtime allowlist.`
-          : `Added ${event.domain} to runtime blocklist.`,
-      )
+      if (action.target === "allowlist") {
+        toast.success(`Added ${event.domain} to runtime allowlist.`)
+      } else {
+        toast.error(`Added ${event.domain} to runtime blocklist.`)
+      }
 
       void load()
       if (selectedId) {
@@ -450,7 +449,7 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
     } catch (actionError) {
       const message =
         actionError instanceof Error ? actionError.message : "Failed to update domain policy list"
-      setError(message)
+      toast.error(message)
     } finally {
       setPendingDomainAction(null)
     }
@@ -532,7 +531,6 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
         </div>
       </header>
 
-      {notice ? <div className="trace-notice">{notice}</div> : null}
       {error ? <div className="trace-error">{error}</div> : null}
 
       <section className="trace-metrics">
@@ -851,6 +849,16 @@ export function DashboardApp({ variant }: { variant: DashboardVariant }) {
         <Sparkles size={14} />
         Live view of full fetch traces, rankings, and allow-exception pathways.
       </footer>
+
+      <Toaster
+        theme={effectiveTheme}
+        position="top-center"
+        richColors
+        closeButton
+        toastOptions={{
+          duration: 4200,
+        }}
+      />
     </div>
   )
 }

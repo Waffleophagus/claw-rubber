@@ -46,6 +46,7 @@
     "react-dom": "^19.2.4",
     "recharts": "^3.7.0",
     "rotating-file-stream": "^3.2.8",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18",
     "turndown": "^7.2.2",
