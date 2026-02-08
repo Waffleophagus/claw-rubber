@@ -8,7 +8,7 @@
   <em>The protection you need.</em>
 </p>
 
-A Bun-based secure proxy for OpenClaw web access via Brave Search.
+A Bun-based secure proxy for OpenClaw web access and Brave Search.
 
 ## Features
 - Brave Web Search proxy (`/v1/search`)
