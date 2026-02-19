@@ -3,6 +3,7 @@ import { evaluateDomainPolicy } from "../lib/domain-policy"
 import { errorResponse, jsonResponse, readJsonBody } from "../lib/http"
 import type { ServerContext } from "../server-context"
 import { QueueOverflowError } from "../services/rate-limiter"
+import { SearchDisabledError, SearchFallbackError } from "../services/search-orchestrator"
 import type { SearchResultRecord, SearchResultResponse } from "../types.ts"
 
 const SearchRequestSchema = z.object({
@@ -29,7 +30,7 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
   try {
     const effectiveAllowlist = ctx.db.getEffectiveAllowlist(ctx.config.allowlistDomains)
     const effectiveBlocklist = ctx.db.getEffectiveBlocklist(ctx.config.blocklistDomains)
-    const brave = await ctx.braveClient.webSearch({
+    const search = await ctx.searchOrchestrator.search({
       query: body.query,
       count: body.count,
       country: body.country,
@@ -38,10 +39,14 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
       freshness: body.freshness,
     })
 
-    ctx.db.storeSearchRequest(requestId, body.query, brave.raw)
+    ctx.db.storeSearchRequest(requestId, body.query, {
+      provider: search.provider,
+      fallback_used: search.fallbackUsed,
+      response: search.raw,
+    })
 
     const now = Date.now()
-    const records: SearchResultRecord[] = brave.results.map((item, index) => {
+    const records: SearchResultRecord[] = search.results.map((item, index) => {
       const resultId = crypto.randomUUID()
       const domain = safeDomain(item.url)
       const domainPolicy = evaluateDomainPolicy(
@@ -111,6 +116,8 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
         requestId,
         query: body.query,
         count: results.length,
+        provider: search.provider,
+        fallbackUsed: search.fallbackUsed,
         durationMs: Date.now() - start,
       },
       "search request completed",
@@ -122,14 +129,19 @@ export async function handleSearch(request: Request, ctx: ServerContext): Promis
       meta: {
         total_returned: results.length,
         urls_exposed: !ctx.config.redactedUrls,
+        provider: search.provider,
+        fallback_used: search.fallbackUsed,
       },
     })
   } catch (error) {
     ctx.loggers.app.error({ error, requestId }, "search request failed")
-    if (error instanceof QueueOverflowError) {
+    if (error instanceof SearchDisabledError) {
+      return errorResponse(503, "Search is disabled")
+    }
+    if (hasQueueOverflow(error)) {
       return errorResponse(503, "Search queue is full, retry shortly")
     }
-    return errorResponse(502, "Failed to query Brave API")
+    return errorResponse(502, "Failed to query search provider")
   }
 }
 
@@ -139,4 +151,16 @@ function safeDomain(url: string): string {
   } catch {
     return "invalid-domain"
   }
+}
+
+function hasQueueOverflow(error: unknown): boolean {
+  if (error instanceof QueueOverflowError) {
+    return true
+  }
+
+  if (error instanceof SearchFallbackError) {
+    return hasQueueOverflow(error.primaryError) || hasQueueOverflow(error.fallbackError)
+  }
+
+  return false
 }

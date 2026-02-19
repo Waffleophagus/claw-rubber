@@ -1,22 +1,14 @@
 import type { AppConfig } from "../config"
 import { RateLimiterQueue } from "./rate-limiter"
+import type {
+  SearchProviderClient,
+  SearchRequest,
+  SearchResponse,
+  SearchResult,
+} from "./search-provider"
 
-export interface BraveWebSearchRequest {
-  query: string
-  count: number
-  country?: string
-  searchLang?: string
-  safesearch?: "off" | "moderate" | "strict"
-  freshness?: string
-}
-
-export interface BraveWebResult {
-  url: string
-  title: string
-  snippet: string
-  source: string
-  published?: string
-}
+export type BraveWebSearchRequest = SearchRequest
+export type BraveWebResult = SearchResult
 
 interface BraveClientDependencies {
   fetchImpl?: (input: Request | URL | string, init?: RequestInit) => Promise<Response>
@@ -26,7 +18,9 @@ interface BraveClientDependencies {
   random?: () => number
 }
 
-export class BraveClient {
+export class BraveClient implements SearchProviderClient {
+  readonly name = "brave" as const
+
   private readonly limiter: RateLimiterQueue
   private readonly fetchImpl: (
     input: Request | URL | string,
@@ -56,7 +50,7 @@ export class BraveClient {
 
   async webSearch(
     request: BraveWebSearchRequest,
-  ): Promise<{ raw: unknown; results: BraveWebResult[] }> {
+  ): Promise<SearchResponse> {
     if (!this.config.braveApiKey) {
       throw new Error("CLAWRUBBER_BRAVE_API_KEY is not configured")
     }
@@ -118,6 +112,10 @@ export class BraveClient {
       raw: json,
       results: normalized,
     }
+  }
+
+  async search(request: SearchRequest): Promise<SearchResponse> {
+    return this.webSearch(request)
   }
 
   private async searchWithRetry(endpoint: string): Promise<Response> {

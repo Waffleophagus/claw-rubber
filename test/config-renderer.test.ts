@@ -12,6 +12,10 @@ test("uses none renderer backend by default", () => {
   expect(config.braveRateLimit.queueMax).toBe(10)
   expect(config.braveRateLimit.retryOn429).toBe(true)
   expect(config.braveRateLimit.retryMax).toBe(1)
+  expect(config.search.strategy).toBe("single")
+  expect(config.search.primary).toBe("brave")
+  expect(config.searxng.baseUrl).toBe("")
+  expect(config.searxng.timeoutMs).toBe(8000)
   expect(config.exposeSafeContentUrls).toBe(true)
 })
 
@@ -52,6 +56,20 @@ test("parses brave rate limit tier and queue settings", () => {
   expect(config.braveRateLimit.queueMax).toBe(25)
   expect(config.braveRateLimit.retryOn429).toBe(false)
   expect(config.braveRateLimit.retryMax).toBe(3)
+})
+
+test("parses search strategy and searxng settings", () => {
+  const config = loadConfig({
+    CLAWRUBBER_SEARCH_STRATEGY: "fallback",
+    CLAWRUBBER_SEARCH_PRIMARY: "searxng",
+    CLAWRUBBER_SEARXNG_BASE_URL: "https://search.example.org/",
+    CLAWRUBBER_SEARXNG_TIMEOUT_MS: "12000",
+  })
+
+  expect(config.search.strategy).toBe("fallback")
+  expect(config.search.primary).toBe("searxng")
+  expect(config.searxng.baseUrl).toBe("https://search.example.org")
+  expect(config.searxng.timeoutMs).toBe(12000)
 })
 
 test("uses explicit brave rate limit rps override and clamps invalid minimums", () => {

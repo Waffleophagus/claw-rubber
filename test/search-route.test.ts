@@ -35,6 +35,11 @@ test("search route returns 503 when brave queue is full", async () => {
         throw new QueueOverflowError("full")
       },
     },
+    searchOrchestrator: {
+      search: async () => {
+        throw new QueueOverflowError("full")
+      },
+    },
     contentFetcher: {},
     llmJudge: {},
   } as unknown as ServerContext

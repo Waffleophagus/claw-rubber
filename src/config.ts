@@ -4,6 +4,8 @@ export type ProfileName = "baseline" | "strict" | "paranoid"
 export type WebsiteRendererBackend = "none" | "browserless"
 export type BrowserlessWaitUntil = "domcontentloaded" | "load" | "networkidle"
 export type BraveRateLimitTier = "free" | "paid" | "base" | "pro"
+export type SearchStrategy = "disabled" | "single" | "fallback"
+export type SearchProvider = "brave" | "searxng"
 
 export interface ProfileSettings {
   mediumThreshold: number
@@ -33,12 +35,24 @@ export interface BraveRateLimitSettings {
   retryMax: number
 }
 
+export interface SearchSettings {
+  strategy: SearchStrategy
+  primary: SearchProvider
+}
+
+export interface SearxngSettings {
+  baseUrl: string
+  timeoutMs: number
+}
+
 export interface AppConfig {
   port: number
   host: string
   braveApiKey: string
   braveApiBaseUrl: string
   braveRateLimit: BraveRateLimitSettings
+  search: SearchSettings
+  searxng: SearxngSettings
   profile: ProfileName
   profileSettings: ProfileSettings
   redactedUrls: boolean
@@ -119,6 +133,10 @@ const EnvSchema = z.object({
   CLAWRUBBER_BRAVE_API_KEY: z.string().default(""),
   CLAWRUBBER_BRAVE_API_BASE_URL: z.string().default("https://api.search.brave.com/res/v1"),
   CLAWRUBBER_RATE_LIMIT: RateLimitSettingSchema.default("free"),
+  CLAWRUBBER_SEARCH_STRATEGY: z.enum(["disabled", "single", "fallback"]).default("single"),
+  CLAWRUBBER_SEARCH_PRIMARY: z.enum(["brave", "searxng"]).default("brave"),
+  CLAWRUBBER_SEARXNG_BASE_URL: z.string().default(""),
+  CLAWRUBBER_SEARXNG_TIMEOUT_MS: z.string().optional(),
   CLAWRUBBER_BRAVE_QUEUE_MAX: z.string().optional(),
   CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429: z.string().optional(),
   CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX: z.string().optional(),
@@ -248,6 +266,14 @@ export function loadConfig(env = process.env): AppConfig {
       queueMax: toMinInteger(parsed.CLAWRUBBER_BRAVE_QUEUE_MAX, 10, 1),
       retryOn429: toBoolean(parsed.CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429, true),
       retryMax: toMinInteger(parsed.CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX, 1, 0),
+    },
+    search: {
+      strategy: parsed.CLAWRUBBER_SEARCH_STRATEGY,
+      primary: parsed.CLAWRUBBER_SEARCH_PRIMARY,
+    },
+    searxng: {
+      baseUrl: parsed.CLAWRUBBER_SEARXNG_BASE_URL.trim().replace(/\/+$/, ""),
+      timeoutMs: toMinInteger(parsed.CLAWRUBBER_SEARXNG_TIMEOUT_MS, 8_000, 100),
     },
     profile: parsed.CLAWRUBBER_PROFILE,
     profileSettings,

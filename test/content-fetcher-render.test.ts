@@ -15,6 +15,14 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       retryOn429: true,
       retryMax: 1,
     },
+    search: {
+      strategy: "single",
+      primary: "brave",
+    },
+    searxng: {
+      baseUrl: "",
+      timeoutMs: 8_000,
+    },
     profile: "strict",
     profileSettings: {
       mediumThreshold: 6,

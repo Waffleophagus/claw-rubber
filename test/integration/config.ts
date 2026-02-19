@@ -14,7 +14,7 @@ export interface IntegrationTestConfig {
 }
 
 export const integrationTestConfig: IntegrationTestConfig = {
-  baseUrl: "",
+  baseUrl: "rubber.waf.lol",
   bearerToken: "",
   searchQuery: "bun runtime docs",
   webFetchTargetUrl: "https://en.wikipedia.org/wiki/Victorian_architecture",

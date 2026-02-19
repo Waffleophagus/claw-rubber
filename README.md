@@ -8,10 +8,10 @@
   <em>The protection you need.</em>
 </p>
 
-A Bun-based secure proxy for OpenClaw web access and Brave Search.
+A Bun-based secure proxy for OpenClaw web access and configurable web search providers (Brave and SearXNG).
 
 ## Features
-- Brave Web Search proxy (`/v1/search`)
+- Web Search proxy (`/v1/search`) with `disabled`, single-provider, or fallback mode
 - Opaque result ID fetch flow (`/v1/fetch`)
 - OpenClaw-style direct URL fetch flow (`/v1/web-fetch`)
 - Human investigator dashboard (`/dashboard`)
@@ -42,6 +42,9 @@ export CLAWRUBBER_LANGUAGE_NAME_ALLOWLIST_EXTRA="Klingon,tlhIngan Hol"
 export CLAWRUBBER_WEBSITE_RENDERER_BACKEND="none"
 export CLAWRUBBER_RATE_LIMIT="free"
 export CLAWRUBBER_BRAVE_QUEUE_MAX="10"
+export CLAWRUBBER_SEARCH_STRATEGY="single"
+export CLAWRUBBER_SEARCH_PRIMARY="brave"
+# export CLAWRUBBER_SEARXNG_BASE_URL="https://your-searxng-instance"
 ```
 
 3. Run server:
@@ -66,7 +69,7 @@ cp env-presets/.env.secure.example .env
 cp env-presets/.env.public.example .env
 ```
 
-Then set required secrets such as `CLAWRUBBER_BRAVE_API_KEY`.
+Then set required provider credentials/URLs (for example `CLAWRUBBER_BRAVE_API_KEY` when Brave is required).
 
 ## Endpoints
 - `POST /v1/search`
@@ -170,6 +173,21 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 - When queue is full, `/v1/search` returns `503`.
 - On Brave `429`, the client retries by default using `retry-after`/`x-ratelimit-reset` headers.
 
+## Search Provider Strategy
+Search supports four practical states using strategy + primary settings:
+
+- `CLAWRUBBER_SEARCH_STRATEGY=disabled` to disable `/v1/search`.
+- `CLAWRUBBER_SEARCH_STRATEGY=single` + `CLAWRUBBER_SEARCH_PRIMARY=brave` for Brave only.
+- `CLAWRUBBER_SEARCH_STRATEGY=single` + `CLAWRUBBER_SEARCH_PRIMARY=searxng` for SearXNG only.
+- `CLAWRUBBER_SEARCH_STRATEGY=fallback` with:
+  - `CLAWRUBBER_SEARCH_PRIMARY=brave` for Brave primary with SearXNG fallback.
+  - `CLAWRUBBER_SEARCH_PRIMARY=searxng` for SearXNG primary with Brave fallback.
+
+Notes:
+- Fallback is one-way and only runs when the primary provider fails.
+- SearXNG requires `CLAWRUBBER_SEARXNG_BASE_URL` when used as primary or fallback.
+- Brave still requires `CLAWRUBBER_BRAVE_API_KEY` when used as primary or fallback.
+
 ## Domain Policy
 - Blocklist wins over allowlist.
 - Allowlisted domains bypass prompt-injection filtering.
@@ -188,6 +206,10 @@ Brave requests are rate-limited through an internal queue to avoid 429s under bu
 - `CLAWRUBBER_BRAVE_QUEUE_MAX` (default `10`)
 - `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_ON_429=true|false` (default `true`)
 - `CLAWRUBBER_BRAVE_RATE_LIMIT_RETRY_MAX` (default `1`)
+- `CLAWRUBBER_SEARCH_STRATEGY=disabled|single|fallback` (default `single`)
+- `CLAWRUBBER_SEARCH_PRIMARY=brave|searxng` (default `brave`)
+- `CLAWRUBBER_SEARXNG_BASE_URL` (required when SearXNG is used)
+- `CLAWRUBBER_SEARXNG_TIMEOUT_MS` (default `8000`)
 - `CLAWRUBBER_PROFILE=baseline|strict|paranoid`
 - `HOST` (default `0.0.0.0`; use `127.0.0.1` for localhost-only binding)
 - `CLAWRUBBER_REDACT_URLS=true|false`

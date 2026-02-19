@@ -26,12 +26,19 @@ import type { ServerContext } from "./server-context"
 import { BraveClient } from "./services/brave-client"
 import { ContentFetcher } from "./services/content-fetcher"
 import { LlmJudge } from "./services/llm-judge"
+import { SearchOrchestrator } from "./services/search-orchestrator"
+import { SearxngClient } from "./services/searxng-client"
 import dashboardV1 from "./dashboard/v1/index.html"
 
 const config = loadConfig()
 const loggers = createLoggers(config)
 const db = new AppDb(config.dbPath)
 const braveClient = new BraveClient(config)
+const searxngClient = new SearxngClient(config)
+const searchOrchestrator = new SearchOrchestrator(config.search, {
+  braveClient,
+  searxngClient,
+})
 const contentFetcher = new ContentFetcher(config)
 const llmJudge = new LlmJudge(config, loggers.app)
 const dashboardFavicon = Bun.file(new URL("./dashboard/v1/favicon.ico", import.meta.url))
@@ -41,6 +48,7 @@ const ctx: ServerContext = {
   db,
   loggers,
   braveClient,
+  searchOrchestrator,
   contentFetcher,
   llmJudge,
 }
@@ -213,6 +221,9 @@ loggers.app.info(
     languageAllowlistExtraSize: config.languageNameAllowlistExtra.length,
     blocklistSize: config.blocklistDomains.length,
     websiteRendererBackend: config.websiteRendererBackend,
+    searchStrategy: config.search.strategy,
+    searchPrimary: config.search.primary,
+    searxngConfigured: Boolean(config.searxng.baseUrl),
     braveRateLimitTier: config.braveRateLimit.tier,
     braveRateLimitRps: config.braveRateLimit.requestsPerSecond,
     braveQueueMax: config.braveRateLimit.queueMax,

@@ -17,6 +17,14 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       retryOn429: true,
       retryMax: 1,
     },
+    search: {
+      strategy: "single",
+      primary: "brave",
+    },
+    searxng: {
+      baseUrl: "",
+      timeoutMs: 8_000,
+    },
     profile: "strict",
     profileSettings: {
       mediumThreshold: 6,
@@ -93,5 +101,35 @@ describe("health and readiness routes", () => {
     }
     expect(payload.status).toBe("not_ready")
     expect(payload.checks?.brave_api_key_configured).toBe(false)
+  })
+
+  test("/readyz allows disabled search mode without provider credentials", async () => {
+    const response = handleReadyz(
+      new Request("http://localhost/readyz"),
+      makeContext(
+        makeConfig({
+          braveApiKey: "",
+          search: {
+            strategy: "disabled",
+            primary: "brave",
+          },
+          searxng: {
+            baseUrl: "",
+            timeoutMs: 8_000,
+          },
+        }),
+        true,
+      ),
+    )
+    expect(response.status).toBe(200)
+
+    const payload = (await response.json()) as {
+      status?: string
+      checks?: { search_enabled?: boolean; brave_required?: boolean; searxng_required?: boolean }
+    }
+    expect(payload.status).toBe("ready")
+    expect(payload.checks?.search_enabled).toBe(false)
+    expect(payload.checks?.brave_required).toBe(false)
+    expect(payload.checks?.searxng_required).toBe(false)
   })
 })
